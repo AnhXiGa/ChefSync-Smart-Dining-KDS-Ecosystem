@@ -1,34 +1,38 @@
 using Microsoft.EntityFrameworkCore;
 using backend.Data;
+using backend.Configuration;
+using backend.Services.Implementations;
+using backend.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ======================================================
-// 1. Database - PostgreSQL
-// ======================================================
+// =====================================================
+// DATABASE
+// =====================================================
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")
+        builder.Configuration
+            .GetConnectionString("DefaultConnection")
     )
 );
 
-// ======================================================
-// 2. Controllers
-// ======================================================
+// =====================================================
+// CONTROLLERS
+// =====================================================
 
 builder.Services.AddControllers();
 
-// ======================================================
-// 3. Swagger / OpenAPI
-// ======================================================
+// =====================================================
+// SWAGGER
+// =====================================================
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ======================================================
-// 4. CORS - React Frontend
-// ======================================================
+// =====================================================
+// CORS
+// =====================================================
 
 builder.Services.AddCors(options =>
 {
@@ -45,15 +49,32 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ======================================================
-// 5. Build
-// ======================================================
+// =====================================================
+// PAYMENT CONFIGURATION
+// =====================================================
+
+builder.Services.Configure<PaymentOptions>(
+    builder.Configuration
+        .GetSection("Payment")
+);
+
+// =====================================================
+// SERVICES
+// =====================================================
+
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+// =====================================================
+// BUILD
+// =====================================================
 
 var app = builder.Build();
 
-// ======================================================
-// 6. HTTP Request Pipeline
-// ======================================================
+// =====================================================
+// SWAGGER
+// =====================================================
 
 if (app.Environment.IsDevelopment())
 {
@@ -61,11 +82,27 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// =====================================================
+// HTTPS
+// =====================================================
+
 app.UseHttpsRedirection();
+
+// =====================================================
+// CORS
+// =====================================================
 
 app.UseCors("AllowReact");
 
+// =====================================================
+// AUTHORIZATION
+// =====================================================
+
 app.UseAuthorization();
+
+// =====================================================
+// CONTROLLERS
+// =====================================================
 
 app.MapControllers();
 
