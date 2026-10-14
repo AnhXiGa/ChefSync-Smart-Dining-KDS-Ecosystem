@@ -1,0 +1,103 @@
+# ==========================================
+# ASP.NET Core / .NET
+# ==========================================
+
+**/bin/
+**/obj/
+**/out/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# ==========================================
+# ASP.NET Core Configuration / Secrets
+# ==========================================
+
+# Do NOT commit real configuration
+**/appsettings.json
+**/appsettings.*.json
+
+# Keep example configuration
+!**/appsettings.example.json
+
+# User secrets
+**/secrets.json
+**/secrets.*.json
+
+# ==========================================
+# Environment Variables
+# ==========================================
+
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# Node / React / Vite
+# ==========================================
+
+**/node_modules/
+**/dist/
+**/build/
+**/.vite/
+
+# Vite local environment
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# ==========================================
+# Logs
+# ==========================================
+
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+# OS generated files
+# ==========================================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+# Coverage / Test results
+# ==========================================
+
+**/TestResults/
+**/coverage/
+*.trx
+
+# ==========================================
+# Database / Local files
+# ==========================================
+
+*.db
+*.db-shm
+*.db-wal
+
+# ==========================================
+# Temporary files
+# ==========================================
+
+*.tmp
+*.temp
+*.swp
+*.bak

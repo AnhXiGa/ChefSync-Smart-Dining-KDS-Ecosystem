@@ -10,6 +10,10 @@ public class AppDbContext : DbContext
     {
     }
 
+    // =====================================================
+    // DBSETS
+    // =====================================================
+
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
@@ -34,9 +38,11 @@ public class AppDbContext : DbContext
 
     public DbSet<Payment> Payments => Set<Payment>();
 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
 
         // =====================================================
         // USERS
@@ -170,6 +176,9 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => x.TableNumber)
                 .IsUnique();
 
+            entity.Property(x => x.Capacity)
+                .IsRequired();
+
             entity.Property(x => x.Status)
                 .HasMaxLength(30)
                 .IsRequired();
@@ -254,13 +263,16 @@ public class AppDbContext : DbContext
                 .IsRequired();
 
             entity.Property(x => x.CurrentStock)
-                .HasPrecision(18, 3);
+                .HasPrecision(18, 3)
+                .IsRequired();
 
             entity.Property(x => x.MinStock)
-                .HasPrecision(18, 3);
+                .HasPrecision(18, 3)
+                .IsRequired();
 
             entity.Property(x => x.CostPerUnit)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
         });
 
 
@@ -316,16 +328,20 @@ public class AppDbContext : DbContext
                 .IsRequired();
 
             entity.Property(x => x.Subtotal)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Discount)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Tax)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.TotalAmount)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Note)
                 .HasMaxLength(500);
@@ -354,11 +370,16 @@ public class AppDbContext : DbContext
                 .HasMaxLength(150)
                 .IsRequired();
 
+            entity.Property(x => x.Quantity)
+                .IsRequired();
+
             entity.Property(x => x.UnitPrice)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Subtotal)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Note)
                 .HasMaxLength(500);
@@ -366,6 +387,9 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Status)
                 .HasMaxLength(30)
                 .IsRequired();
+
+            entity.Property(x => x.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(x => x.Order)
                 .WithMany(x => x.OrderItems)
@@ -394,13 +418,16 @@ public class AppDbContext : DbContext
                 .IsRequired();
 
             entity.Property(x => x.Quantity)
-                .HasPrecision(18, 3);
+                .HasPrecision(18, 3)
+                .IsRequired();
 
             entity.Property(x => x.BeforeStock)
-                .HasPrecision(18, 3);
+                .HasPrecision(18, 3)
+                .IsRequired();
 
             entity.Property(x => x.AfterStock)
-                .HasPrecision(18, 3);
+                .HasPrecision(18, 3)
+                .IsRequired();
 
             entity.Property(x => x.ReferenceType)
                 .HasMaxLength(50);
@@ -467,7 +494,8 @@ public class AppDbContext : DbContext
                 .IsRequired();
 
             entity.Property(x => x.TotalAmount)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Note)
                 .HasMaxLength(500);
@@ -495,13 +523,16 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.Quantity)
-                .HasPrecision(18, 3);
+                .HasPrecision(18, 3)
+                .IsRequired();
 
             entity.Property(x => x.UnitPrice)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.Subtotal)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.HasOne(x => x.PurchaseOrder)
                 .WithMany(x => x.PurchaseOrderItems)
@@ -525,8 +556,14 @@ public class AppDbContext : DbContext
 
             entity.HasKey(x => x.Id);
 
+
+            // -------------------------------------------------
+            // BASIC
+            // -------------------------------------------------
+
             entity.Property(x => x.Amount)
-                .HasPrecision(18, 2);
+                .HasPrecision(18, 2)
+                .IsRequired();
 
             entity.Property(x => x.PaymentMethod)
                 .HasMaxLength(50)
@@ -536,11 +573,51 @@ public class AppDbContext : DbContext
                 .HasMaxLength(30)
                 .IsRequired();
 
+
+            // -------------------------------------------------
+            // CASH PAYMENT
+            // -------------------------------------------------
+
+            entity.Property(x => x.ReceivedAmount)
+                .HasPrecision(18, 2);
+
+            entity.Property(x => x.ChangeAmount)
+                .HasPrecision(18, 2);
+
+
+            // -------------------------------------------------
+            // BANK TRANSFER
+            // -------------------------------------------------
+
             entity.Property(x => x.TransactionCode)
                 .HasMaxLength(100);
 
+            entity.Property(x => x.TransferContent)
+                .HasMaxLength(200);
+
+            entity.Property(x => x.QrCodeUrl)
+                .HasMaxLength(1000);
+
+
+            // -------------------------------------------------
+            // DATETIME
+            // -------------------------------------------------
+
+            entity.Property(x => x.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+
+            // -------------------------------------------------
+            // INDEX
+            // -------------------------------------------------
+
             entity.HasIndex(x => x.TransactionCode)
                 .IsUnique();
+
+
+            // -------------------------------------------------
+            // RELATIONSHIP
+            // -------------------------------------------------
 
             entity.HasOne(x => x.Order)
                 .WithMany(x => x.Payments)
