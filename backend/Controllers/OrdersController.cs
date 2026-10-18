@@ -6,21 +6,6 @@ namespace backend.Controllers;
 [Route("api/orders")]
 public sealed class OrdersController : ApiScaffoldController
 {
-    [HttpGet]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult GetOrders()
-        => NotImplementedForDemo();
-
-    [HttpGet("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult GetOrder(int id)
-        => NotImplementedForDemo();
-
-    [HttpPost]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult CreateOrder([FromBody] JsonElement request)
-        => NotImplementedForDemo();
-
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public IActionResult UpdateOrder(int id, [FromBody] JsonElement request)
@@ -34,11 +19,6 @@ public sealed class OrdersController : ApiScaffoldController
     [HttpPost("{id:int}/confirm")]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public IActionResult ConfirmOrder(int id)
-        => NotImplementedForDemo();
-
-    [HttpPost("{id:int}/cancel")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult CancelOrder(int id)
         => NotImplementedForDemo();
 
     [HttpGet("{orderId:int}/items")]

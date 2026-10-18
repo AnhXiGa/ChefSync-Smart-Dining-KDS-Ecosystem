@@ -3039,19 +3039,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\anhkhoa\\.nuget\\packages\\": {}
+    "C:\\Users\\DELL\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\hoctap\\ChefSync\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
+      "projectUniqueName": "C:\\Users\\DELL\\OneDrive\\Documents\\Code\\NhaHang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
       "projectName": "backend",
-      "projectPath": "C:\\hoctap\\ChefSync\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
-      "packagesPath": "C:\\Users\\anhkhoa\\.nuget\\packages\\",
-      "outputPath": "C:\\hoctap\\ChefSync\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\obj\\",
+      "projectPath": "C:\\Users\\DELL\\OneDrive\\Documents\\Code\\NhaHang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
+      "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\DELL\\OneDrive\\Documents\\Code\\NhaHang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\anhkhoa\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\DELL\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
