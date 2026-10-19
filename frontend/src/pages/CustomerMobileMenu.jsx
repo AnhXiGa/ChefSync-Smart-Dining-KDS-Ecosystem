@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'https://localhost:7123'}/api/customer`;
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5266'}/api/customer`;
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('vi-VN', {

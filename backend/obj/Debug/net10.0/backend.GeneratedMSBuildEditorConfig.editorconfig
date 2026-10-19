@@ -19,21 +19,13 @@ build_property.TargetFrameworkIdentifier = .NETCoreApp
 build_property.TargetFrameworkVersion = v10.0
 build_property.RootNamespace = backend
 build_property.RootNamespace = backend
-<<<<<<< HEAD
 build_property.ProjectDir = C:\Users\DELL\OneDrive\Documents\Code\NhaHang\ChefSync-Smart-Dining-KDS-Ecosystem\backend\
-=======
-build_property.ProjectDir = E:\Dev\ChefSync-Smart-Dining-KDS-Ecosystem\backend\
->>>>>>> 49297ccf53caa4bc3cc35b10e614a687dad23d1c
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 9.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-<<<<<<< HEAD
 build_property.MSBuildProjectDirectory = C:\Users\DELL\OneDrive\Documents\Code\NhaHang\ChefSync-Smart-Dining-KDS-Ecosystem\backend
-=======
-build_property.MSBuildProjectDirectory = E:\Dev\ChefSync-Smart-Dining-KDS-Ecosystem\backend
->>>>>>> 49297ccf53caa4bc3cc35b10e614a687dad23d1c
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 10.0
 build_property.EnableCodeStyleSeverity = 

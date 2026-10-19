@@ -1,7 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
 
 :root {
-<<<<<<< HEAD
   font-family: Inter, 'Segoe UI', sans-serif;
   color: #1f2937;
   background: #e5e7eb;
@@ -298,23 +297,9 @@ button, input, textarea {
 }
 
 .cart-header h3 {
-=======
-  font-family: "DM Sans", "Segoe UI", sans-serif;
-  color: #273b35;
-  background: #f7f7f3;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-* {
-  box-sizing: border-box;
-}
-body {
->>>>>>> 49297ccf53caa4bc3cc35b10e614a687dad23d1c
   margin: 0;
   min-width: 1024px;
 }
-<<<<<<< HEAD
 
 .cart-header button {
   border: none;
@@ -465,13 +450,4 @@ body {
   to {
     transform: rotate(360deg);
   }
-=======
-button,
-input,
-textarea {
-  font: inherit;
-}
-button {
-  cursor: pointer;
->>>>>>> 49297ccf53caa4bc3cc35b10e614a687dad23d1c
 }
