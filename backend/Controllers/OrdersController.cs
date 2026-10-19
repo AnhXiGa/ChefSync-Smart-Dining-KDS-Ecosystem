@@ -55,11 +55,6 @@ public sealed class OrdersController : ApiScaffoldController
     public IActionResult ConfirmOrder(int id)
         => NotImplementedForDemo();
 
-    [HttpPost("{id:int}/cancel")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult CancelOrder(int id)
-        => NotImplementedForDemo();
-
     [HttpGet("{orderId:int}/items")]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public IActionResult GetOrderItems(int orderId)

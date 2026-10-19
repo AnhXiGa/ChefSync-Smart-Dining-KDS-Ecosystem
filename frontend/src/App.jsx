@@ -1,8 +1,15 @@
-import InventoryManagement from "./pages/InventoryManagement";
-import "./App.css";
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import CustomerMobileMenu from './pages/CustomerMobileMenu';
 
 function App() {
-  return <InventoryManagement />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<CustomerMobileMenu />} />
+        <Route path="/menu" element={<CustomerMobileMenu />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;

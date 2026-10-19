@@ -11,19 +11,9 @@ public sealed class PaymentsController : ApiScaffoldController
     public IActionResult GetPayments()
         => NotImplementedForDemo();
 
-    [HttpGet("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult GetPayment(int id)
-        => NotImplementedForDemo();
-
     [HttpGet("/api/orders/{orderId:int}/payments")]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public IActionResult GetOrderPayments(int orderId)
-        => NotImplementedForDemo();
-
-    [HttpPost]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult CreatePayment([FromBody] JsonElement request)
         => NotImplementedForDemo();
 
     [HttpPost("{id:int}/confirm")]

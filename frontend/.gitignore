@@ -1,24 +1,59 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# ==================================
+# Visual Studio / VS Code workspace files
+# ==================================
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
-node_modules
-dist
-dist-ssr
+# ==================================
+# Build output / Compiled files (Bin & Obj)
+# ==================================
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]emp/
+[Tt]mp/
+
+# ==================================
+# ASP.NET Core specific
+# ==================================
+project.lock.json
+project.fragment.lock.json
+artifacts/
+.net/
+
+# ==================================
+# User-specific / Database files
+# ==================================
+# Nếu bạn dùng SQLite (file .db nằm cục bộ), hãy bỏ dấu # ở dòng dưới để Git không đẩy database lên
+# *.db
+# *.db-shm
+# *.db-wal
+
+# Thông tin cấu hình mật khẩu/secret local của cá nhân
+secrets.json
+appsettings.Development.json
 *.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# ==================================
+# Published output
+# ==================================
+[Oo]utput/
+[Pp]ublish/
+*.[Pp]ublish.xml
+
+# ==================================
+# OS generated files
+# ==================================
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
