@@ -135,7 +135,6 @@ E:\Dev\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.gen
 E:\Dev\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\ref\backend.dll
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\appsettings.Development.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\appsettings.json
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\backend.staticwebassets.endpoints.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\backend.exe
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\backend.deps.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\backend.runtimeconfig.json
@@ -245,7 +244,6 @@ C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\zh-Hans\Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.csproj.AssemblyReference.cache
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\rpswa.dswa.cache.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.GeneratedMSBuildEditorConfig.editorconfig
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.AssemblyInfoInputs.cache
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.AssemblyInfo.cs
@@ -253,6 +251,14 @@ C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.MvcApplicationPartsAssemblyInfo.cs
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.MvcApplicationPartsAssemblyInfo.cache
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.sourcelink.json
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.csproj.Up2Date
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.dll
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\refint\backend.dll
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.pdb
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.genruntimeconfig.cache
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\ref\backend.dll
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\bin\Debug\net10.0\backend.staticwebassets.endpoints.json
+C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\rpswa.dswa.cache.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\rjimswa.dswa.cache.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
@@ -262,9 +268,3 @@ C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\staticwebassets.development.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\staticwebassets.build.endpoints.json
 C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\swae.build.ex.cache
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.csproj.Up2Date
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.dll
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\refint\backend.dll
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.pdb
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\backend.genruntimeconfig.cache
-C:\hoctap\ChefSync\ChefSync-Smart-Dining-KDS-Ecosystem\backend\obj\Debug\net10.0\ref\backend.dll

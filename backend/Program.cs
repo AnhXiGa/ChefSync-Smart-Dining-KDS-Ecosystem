@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using backend.Data;
 using backend.Configuration;
+using backend.Hubs;
 using backend.Services.Implementations;
 using backend.Services.Interfaces;
 
@@ -22,6 +23,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // =====================================================
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 // =====================================================
 // SWAGGER
@@ -65,6 +67,8 @@ builder.Services.Configure<PaymentOptions>(
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IKdsService, KdsService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // =====================================================
 // BUILD
@@ -105,5 +109,7 @@ app.UseAuthorization();
 // =====================================================
 
 app.MapControllers();
+app.MapHub<OrderHub>("/hubs/orders");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
