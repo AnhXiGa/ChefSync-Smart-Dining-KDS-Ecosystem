@@ -65,6 +65,7 @@ builder.Services.Configure<PaymentOptions>(
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 // =====================================================
 // BUILD

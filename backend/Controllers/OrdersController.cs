@@ -1,4 +1,6 @@
 using System.Text.Json;
+using backend.DTOs.Orders;
+using backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers;
@@ -6,6 +8,13 @@ namespace backend.Controllers;
 [Route("api/orders")]
 public sealed class OrdersController : ApiScaffoldController
 {
+    private readonly IOrderService _orderService;
+
+    public OrdersController(IOrderService orderService)
+    {
+        _orderService = orderService;
+    }
+
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public IActionResult GetOrders()
@@ -27,9 +36,19 @@ public sealed class OrdersController : ApiScaffoldController
         => NotImplementedForDemo();
 
     [HttpPatch("{id:int}/status")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult UpdateOrderStatus(int id, [FromBody] JsonElement request)
-        => NotImplementedForDemo();
+    public async Task<IActionResult> UpdateOrderStatus(
+        int id,
+        [FromBody] UpdateOrderStatusRequest request)
+    {
+        try
+        {
+            return Ok(await _orderService.UpdateStatusAsync(id, request));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
 
     [HttpPost("{id:int}/confirm")]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]

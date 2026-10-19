@@ -3,16 +3,21 @@ using backend.DTOs.Orders;
 using backend.Models;
 using backend.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace backend.Services.Implementations;
 
 public class OrderService : IOrderService
 {
     private readonly AppDbContext _context;
+    private readonly IInventoryService _inventoryService;
 
-    public OrderService(AppDbContext context)
+    public OrderService(
+        AppDbContext context,
+        IInventoryService inventoryService)
     {
         _context = context;
+        _inventoryService = inventoryService;
     }
 
     // =========================================================
@@ -206,6 +211,9 @@ public class OrderService : IOrderService
         int orderId,
         UpdateOrderStatusRequest request)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable);
+
         var order = await _context.Orders
             .Include(x => x.Table)
             .Include(x => x.OrderItems)
@@ -220,6 +228,7 @@ public class OrderService : IOrderService
         var validStatuses = new[]
         {
             "Pending",
+            "Accepted",
             "Confirmed",
             "Preparing",
             "Ready",
@@ -238,6 +247,14 @@ public class OrderService : IOrderService
         {
             throw new Exception(
                 "Không thể thay đổi đơn hàng đã kết thúc.");
+        }
+
+        if (status == "Accepted" && order.Status != "Accepted")
+        {
+            await _inventoryService.DeductForOrderAsync(
+                order.Id,
+                order.OrderItems.Select(x => (x.ProductId, x.Quantity)).ToList(),
+                CancellationToken.None);
         }
 
         order.Status = status;
@@ -263,6 +280,7 @@ public class OrderService : IOrderService
         }
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return MapToResponse(order);
     }
