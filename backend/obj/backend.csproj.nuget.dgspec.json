@@ -1,19 +1,6 @@
 {
   "format": 1,
   "restore": {
-<<<<<<< HEAD
-    "E:\\Dev\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj": {}
-  },
-  "projects": {
-    "E:\\Dev\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj": {
-      "version": "1.0.0",
-      "restore": {
-        "projectUniqueName": "E:\\Dev\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
-        "projectName": "backend",
-        "projectPath": "E:\\Dev\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\HOME\\.nuget\\packages\\",
-        "outputPath": "E:\\Dev\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\obj\\",
-=======
     "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj": {}
   },
   "projects": {
@@ -25,19 +12,14 @@
         "projectPath": "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
         "packagesPath": "C:\\Users\\ADMIN\\.nuget\\packages\\",
         "outputPath": "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\obj\\",
->>>>>>> 0a1f49ac36316ff78bd51cb05340014a62b412c3
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-<<<<<<< HEAD
-          "C:\\Users\\HOME\\AppData\\Roaming\\NuGet\\NuGet.Config"
-=======
           "C:\\Users\\ADMIN\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
->>>>>>> 0a1f49ac36316ff78bd51cb05340014a62b412c3
         ],
         "originalTargetFrameworks": [
           "net10.0"
