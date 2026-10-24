@@ -9,7 +9,7 @@ export default function InventoryManagement() {
   const [transactions, setTransactions] = useState([]);
   const [bom, setBom] = useState([]);
   const [bomForm, setBomForm] = useState({ productId: "", ingredientId: "", quantity: "" });
-  const [orderId, setOrderId] = useState("9001");
+  const [orderId, setOrderId] = useState("1");
   const [form, setForm] = useState(emptyIngredient);
   const [adjustment, setAdjustment] = useState({ ingredientId: "", quantity: "", note: "" });
   const [error, setError] = useState("");
@@ -40,6 +40,7 @@ export default function InventoryManagement() {
         ...form,
         initialStock: Number(form.initialStock),
         minimumStock: Number(form.minimumStock),
+        costPerUnit: Number(form.costPerUnit),
       });
       setForm(emptyIngredient);
       await load();
@@ -121,8 +122,9 @@ export default function InventoryManagement() {
           <div className="panel-header"><div><span className="panel-kicker">DANH MỤC KHO</span><h2>Thêm nguyên liệu</h2></div><span className="panel-symbol">＋</span></div>
           <label>Tên nguyên liệu<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label>Đơn vị<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></label>
-          <label>Tồn đầu kỳ<input type="number" min="0" step="0.001" value={form.initialStock} onChange={(e) => setForm({ ...form, initialStock: e.target.value })} /></label>
-          <label>Ngưỡng cảnh báo<input type="number" min="0" step="0.001" value={form.minimumStock} onChange={(e) => setForm({ ...form, minimumStock: e.target.value })} /></label>
+          <label>Tồn đầu kỳ<input type="number"  value={form.initialStock} onChange={(e) => setForm({ ...form, initialStock: e.target.value })} /></label>
+          <label>Ngưỡng cảnh báo<input type="number"  value={form.minimumStock} onChange={(e) => setForm({ ...form, minimumStock: e.target.value })} /></label>
+          <label>Giá<input type="number"  value={form.costPerUnit} onChange={(e) => setForm({ ...form, costPerUnit: e.target.value })} /></label>
           <button type="submit">Lưu nguyên liệu</button>
         </form>
 
@@ -155,7 +157,7 @@ export default function InventoryManagement() {
         </div>
         <form className="bom-toolbar" onSubmit={addBomItem}>
           <label>Nguyên liệu<select required value={bomForm.ingredientId} onChange={(e) => setBomForm({ ...bomForm, ingredientId: e.target.value })}><option value="">Chọn nguyên liệu</option>{ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}</select></label>
-          <label>Số lượng / phần<input required type="number" min="0.000001" step="0.001" value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} /></label>
+          <label>Số lượng / phần<input required type="number"  value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} /></label>
           <button type="submit">Thêm vào BOM</button>
         </form>
         <div className="table-wrap"><table className="data-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị kho</th><th>Định lượng / phần</th></tr></thead><tbody>{bom.length === 0 ? <tr><td className="empty-state" colSpan="3">Chưa có định lượng cho món này.</td></tr> : bom.map((item) => <tr key={item.ingredientId}><td className="name-cell">{item.ingredientName}</td><td><span className="unit-pill">{item.unit}</span></td><td className="number-cell">{item.quantity}</td></tr>)}</tbody></table></div>
