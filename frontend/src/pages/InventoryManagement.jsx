@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axiosClient from "../api/axiosClient";
 import "./InventoryManagement.css";
 
@@ -14,7 +14,7 @@ export default function InventoryManagement() {
   const [adjustment, setAdjustment] = useState({ ingredientId: "", quantity: "", note: "" });
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [ingredientResponse, transactionResponse] = await Promise.all([
         axiosClient.get("/api/ingredients"),
@@ -26,9 +26,13 @@ export default function InventoryManagement() {
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? "Không thể tải dữ liệu kho.");
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // Initial data loading is the external synchronization this effect owns.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
 
   const lowStockCount = ingredients.filter((ingredient) => ingredient.isLowStock).length;
   const totalStockItems = ingredients.length;
