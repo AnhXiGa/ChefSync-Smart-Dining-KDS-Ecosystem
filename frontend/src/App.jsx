@@ -1,13 +1,17 @@
-import { BrowserRouter } from 'react-router-dom'
-import './App.css'
-import { AppRoutes } from './routes/AppRoutes'
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import CustomerMobileMenu from './pages/CustomerMobileMenu';
+import InventoryManagement from './pages/InventoryManagement';
 
 function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <Routes>
+        <Route path="/" element={<CustomerMobileMenu />} />
+        <Route path="/menu" element={<CustomerMobileMenu />} />
+        <Route path="/inventory" element={<InventoryManagement />} />
+      </Routes>
     </BrowserRouter>
-  )
+  );
 }
 
-export default App
+export default App;

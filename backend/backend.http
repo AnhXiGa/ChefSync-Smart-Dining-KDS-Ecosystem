@@ -1,6 +1,77 @@
 @backend_HostAddress = http://localhost:5266
 
-GET {{backend_HostAddress}}/weatherforecast/
+### KDS: active orders
+GET {{backend_HostAddress}}/api/kds/orders
 Accept: application/json
 
 ###
+
+### KDS: active order items
+GET {{backend_HostAddress}}/api/kds/order-items
+Accept: application/json
+
+###
+
+### KDS: filter items by status
+GET {{backend_HostAddress}}/api/kds/order-items?status=Preparing
+Accept: application/json
+
+###
+
+### KDS: accept an item
+PATCH {{backend_HostAddress}}/api/kds/order-items/1/accept
+
+###
+
+### KDS: start preparing an item
+PATCH {{backend_HostAddress}}/api/kds/order-items/1/start
+
+###
+
+### KDS: mark an item ready
+PATCH {{backend_HostAddress}}/api/kds/order-items/1/ready
+
+###
+
+### KDS: mark an item served
+PATCH {{backend_HostAddress}}/api/kds/order-items/1/served
+
+###
+
+### KDS: summary
+GET {{backend_HostAddress}}/api/kds/summary
+Accept: application/json
+
+###
+
+### Notifications for a user
+GET {{backend_HostAddress}}/api/notifications?userId=1
+Accept: application/json
+
+###
+
+### Get a user's notification
+GET {{backend_HostAddress}}/api/notifications/1?userId=1
+Accept: application/json
+
+###
+
+### Mark a user's notification as read
+PATCH {{backend_HostAddress}}/api/notifications/1/read?userId=1
+
+###
+
+### Mark all of a user's notifications as read
+PATCH {{backend_HostAddress}}/api/notifications/read-all?userId=1
+
+###
+
+### Delete a user's notification
+DELETE {{backend_HostAddress}}/api/notifications/1?userId=1
+
+###
+
+# SignalR hub: {{backend_HostAddress}}/hubs/orders
+# Invoke JoinOrder(orderId) to subscribe to OrderItemStatusChanged events.
+# SignalR hub: {{backend_HostAddress}}/hubs/notifications
+# Invoke JoinUserNotifications(userId) to subscribe to NotificationsChanged events.

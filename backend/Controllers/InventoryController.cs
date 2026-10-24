@@ -1,33 +1,46 @@
-using System.Text.Json;
+using backend.DTOs.Inventory;
+using backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers;
 
+[ApiController]
 [Route("api/inventory")]
-public sealed class InventoryController : ApiScaffoldController
+public sealed class InventoryController(IInventoryService inventory) : ControllerBase
 {
     [HttpGet("low-stock")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult GetLowStock()
-        => NotImplementedForDemo();
+    public async Task<ActionResult<IReadOnlyList<IngredientResponse>>> GetLowStock(
+        CancellationToken cancellationToken)
+    {
+        var ingredients = await inventory.GetIngredientsAsync(cancellationToken);
+        return Ok(ingredients.Where(x => x.IsLowStock).ToList());
+    }
 
     [HttpGet("transactions")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult GetTransactions()
-        => NotImplementedForDemo();
+    public async Task<ActionResult<IReadOnlyList<InventoryTransactionResponse>>> GetTransactions(
+        [FromQuery] int? ingredientId, CancellationToken cancellationToken)
+        => Ok(await inventory.GetTransactionsAsync(ingredientId, cancellationToken));
 
-    [HttpGet("transactions/{id:int}")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult GetTransaction(int id)
-        => NotImplementedForDemo();
+    [HttpPost("adjustments/{ingredientId:int}")]
+    public async Task<ActionResult<IngredientResponse>> Adjust(
+        int ingredientId, InventoryAdjustmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await inventory.AdjustStockAsync(
+            ingredientId, request, "Adjustment", cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
 
-    [HttpPost("adjustments")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult CreateAdjustment([FromBody] JsonElement request)
-        => NotImplementedForDemo();
+    [HttpPost("receipts/{ingredientId:int}")]
+    public async Task<ActionResult<IngredientResponse>> Receive(
+        int ingredientId, InventoryAdjustmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Quantity <= 0)
+            return BadRequest(new { message = "Số lượng nhập phải lớn hơn 0." });
 
-    [HttpPost("issues")]
-    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
-    public IActionResult CreateIssue([FromBody] JsonElement request)
-        => NotImplementedForDemo();
+        var result = await inventory.AdjustStockAsync(
+            ingredientId, request, "Receipt", cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
 }
