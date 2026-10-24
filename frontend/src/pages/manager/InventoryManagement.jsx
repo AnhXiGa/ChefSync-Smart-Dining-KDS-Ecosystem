@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axiosClient from "../api/axiosClient";
+import axiosClient from "../../api/axiosClient";
 import "./InventoryManagement.css";
 
 const emptyIngredient = { name: "", unit: "kg", initialStock: 0, minimumStock: 0 };

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import restaurantImage from "../../assets/login-restaurant.png";
 
+
 const roleRoutes = {
   staff: "/staff/tables",
   manager: "/manager",

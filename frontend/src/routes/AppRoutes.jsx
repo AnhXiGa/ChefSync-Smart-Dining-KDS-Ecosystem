@@ -7,6 +7,7 @@ import { ManagerDashboardPage } from '../pages/manager/ManagerDashboardPage'
 import { StaffOrderPage } from '../pages/staff/StaffOrderPage'
 import { StaffPaymentsPage } from '../pages/staff/StaffPaymentsPage'
 import { StaffTablesPage } from '../pages/staff/StaffTablesPage'
+import InventoryManagement from '../pages/manager/InventoryManagement'
 
 export function AppRoutes() {
   return <Routes>
@@ -22,6 +23,7 @@ export function AppRoutes() {
     <Route path="/manager/suppliers" element={<AdminModulePage module="suppliers" />} />
     <Route path="/manager/expenses" element={<AdminModulePage module="expenses" />} />
     <Route path="/manager/users" element={<AdminModulePage module="users" />} />
+    <Route path="/manager/inventory" element={<InventoryManagement module="inventory" />} />
 
     <Route path="/staff/tables" element={<StaffTablesPage />} />
     <Route path="/staff/order/:tableId" element={<StaffOrderPage />} />
