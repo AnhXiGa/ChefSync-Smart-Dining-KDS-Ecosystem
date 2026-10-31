@@ -1,34 +1,41 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import "./InventoryManagement.css";
 
-const emptyIngredient = { name: "", unit: "kg", initialStock: 0, minimumStock: 0 };
+const emptyIngredient = { name: "", unit: "kg", initialStock: 0, minimumStock: 0, costPerUnit: "" };
 
 export default function InventoryManagement() {
   const [ingredients, setIngredients] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [bom, setBom] = useState([]);
+  const [products, setProducts] = useState([]);
   const [bomForm, setBomForm] = useState({ productId: "", ingredientId: "", quantity: "" });
-  const [orderId, setOrderId] = useState("1");
-  const [form, setForm] = useState(emptyIngredient);
+  const [orderId, setOrderId] = useState("");
+  const [form, setForm] = useState({ ...emptyIngredient, costPerUnit: "" });
   const [adjustment, setAdjustment] = useState({ ingredientId: "", quantity: "", note: "" });
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const [ingredientResponse, transactionResponse] = await Promise.all([
+      const [ingredientResponse, transactionResponse, menuResponse] = await Promise.all([
         axiosClient.get("/api/ingredients"),
         axiosClient.get("/api/inventory/transactions"),
+        axiosClient.get("/api/menu"),
       ]);
       setIngredients(ingredientResponse.data);
       setTransactions(transactionResponse.data);
+      setProducts(menuResponse.data.flatMap((category) => category.products ?? []));
       setError("");
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? "Không thể tải dữ liệu kho.");
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // Initial data loading is the external synchronization this effect owns.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
 
   const lowStockCount = ingredients.filter((ingredient) => ingredient.isLowStock).length;
   const totalStockItems = ingredients.length;
@@ -152,7 +159,12 @@ export default function InventoryManagement() {
       <section className="panel inventory-section">
         <div className="section-heading"><div><span className="panel-kicker">CÔNG THỨC MÓN</span><h2>Định lượng món ăn (BOM)</h2></div><span className="section-count">Theo từng phần</span></div>
         <div className="bom-toolbar">
-          <label>Mã món ăn<input type="number" min="1" value={bomForm.productId} onChange={(e) => setBomForm({ ...bomForm, productId: e.target.value })} /></label>
+          <label>Món ăn
+            <select required value={bomForm.productId} onChange={(e) => setBomForm({ ...bomForm, productId: e.target.value })}>
+              <option value="">Chọn món ăn</option>
+              {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+          </label>
           <button type="button" onClick={loadBom}>Xem định lượng</button>
         </div>
         <form className="bom-toolbar" onSubmit={addBomItem}>
@@ -172,7 +184,7 @@ export default function InventoryManagement() {
           </label>
           <button type="submit">Accepted và trừ kho</button>
         </form>
-        <p className="test-hint">Dữ liệu mẫu: đơn 9001 gồm 3 phần Phở bò, dự kiến trừ 0.300 kg thịt bò.</p>
+        <p className="test-hint">Chỉ khi đơn chuyển sang Accepted, hệ thống mới nhân số lượng món với BOM và ghi giao dịch xuất kho.</p>
       </section>
 
       <section className="panel inventory-section">

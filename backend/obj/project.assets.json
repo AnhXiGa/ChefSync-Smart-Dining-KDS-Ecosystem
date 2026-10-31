@@ -3045,11 +3045,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
+      "projectUniqueName": "c:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
       "projectName": "backend",
-      "projectPath": "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
+      "projectPath": "c:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
       "packagesPath": "C:\\Users\\ADMIN\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\obj\\",
+      "outputPath": "c:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
