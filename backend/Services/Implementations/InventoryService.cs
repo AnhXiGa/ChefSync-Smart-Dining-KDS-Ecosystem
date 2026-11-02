@@ -199,10 +199,20 @@ public sealed class InventoryService(AppDbContext context) : IInventoryService
         IReadOnlyList<(int ProductId, int Quantity)> items,
         CancellationToken cancellationToken)
     {
+        if (items.Count == 0)
+            throw new InvalidOperationException("Đơn hàng chưa có món ăn.");
+
         var productIds = items.Select(x => x.ProductId).Distinct().ToList();
         var bom = await context.ProductIngredients.AsNoTracking()
             .Where(x => productIds.Contains(x.ProductId))
             .ToListAsync(cancellationToken);
+
+        var productsWithoutBom = productIds
+            .Except(bom.Select(x => x.ProductId))
+            .ToList();
+        if (productsWithoutBom.Count > 0)
+            throw new InvalidOperationException(
+                $"Món ăn chưa có định lượng nguyên liệu: {string.Join(", ", productsWithoutBom)}.");
 
         var required = bom.Join(
                 items,

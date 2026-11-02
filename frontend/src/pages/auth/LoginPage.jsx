@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axiosClient from "../../api/axiosClient";
 import restaurantImage from "../../assets/login-restaurant.png";
-
+import "../../App.css";
 
 const roleRoutes = {
   staff: "/staff/tables",
@@ -17,15 +18,28 @@ export function LoginPage() {
   const [role, setRole] = useState("staff");
   const [error, setError] = useState("");
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Vui lòng nhập đầy đủ email và mật khẩu.");
       return;
     }
-    setError("");
-    if (remember) localStorage.setItem("smart-pos-email", email.trim());
-    navigate(roleRoutes[role]);
+    try {
+      const response = await axiosClient.post("/api/auth/login", {
+        email: email.trim(),
+        password,
+      });
+      const user = response.data.user;
+      const roles = user.roles ?? [];
+      const destination = roles.includes("Manager")
+        ? "/manager"
+        : roleRoutes[role];
+      localStorage.setItem("smart-pos-user", JSON.stringify(user));
+      if (remember) localStorage.setItem("smart-pos-email", email.trim());
+      navigate(destination);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message ?? "Không thể đăng nhập.");
+    }
   };
 
   return (
