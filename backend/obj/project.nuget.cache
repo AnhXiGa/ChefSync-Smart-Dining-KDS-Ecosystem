@@ -1,14 +1,8 @@
 {
   "version": 2,
-<<<<<<< HEAD
   "dgSpecHash": "xsLlUIUmIfk=",
   "success": true,
   "projectFilePath": "D:\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
-=======
-  "dgSpecHash": "ZtxnUvd5Tr4=",
-  "success": true,
-  "projectFilePath": "C:\\Users\\ADMIN\\Desktop\\nha hang\\ChefSync-Smart-Dining-KDS-Ecosystem\\backend\\backend.csproj",
->>>>>>> 0a1f49ac36316ff78bd51cb05340014a62b412c3
   "expectedPackageFiles": [
     "C:\\Users\\ADMIN\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\ADMIN\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\10.0.12\\microsoft.aspnetcore.authentication.jwtbearer.10.0.12.nupkg.sha512",
