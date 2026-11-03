@@ -21,9 +21,9 @@ export const navigationGroups = [
       ['inventory', '◈', 'Nguyên vật liệu', '/manager/inventory'],
       ['bom', '⚖', 'Định lượng BOM', '/manager/bom'],
       ['stock-in', '↔', 'Nhập kho', '/manager/stock-in'],
+      ['receipts', '▤', 'Phiếu nhập hàng', '/manager/purchase-orders'],
       ['stock-out', '↔', 'Xuất kho', '/manager/stock-out'],
       ['suppliers', '▱', 'Nhà cung cấp', '/manager/suppliers'],
-      ['receipts', '▤', 'Phiếu nhập hàng', '/manager/stock-in'],
     ],
   },
   {
