@@ -15,13 +15,13 @@ export function AppRoutes() {
 
     <Route path="/manager" element={<ManagerDashboardPage />} />
     <Route path="/manager/menu" element={<AdminModulePage module="menu" />} />
-    <Route path="/manager/inventory" element={<AdminModulePage module="inventory" />} />
-    <Route path="/manager/bom" element={<AdminModulePage module="bom" />} />
     <Route path="/manager/stock-in" element={<AdminModulePage module="stock-in" />} />
     <Route path="/manager/stock-out" element={<AdminModulePage module="stock-out" />} />
     <Route path="/manager/suppliers" element={<AdminModulePage module="suppliers" />} />
     <Route path="/manager/expenses" element={<AdminModulePage module="expenses" />} />
     <Route path="/manager/users" element={<AdminModulePage module="users" />} />
+    <Route path="/manager/inventory" element={<AdminModulePage module="inventory" />} />
+    <Route path="/manager/bom" element={<AdminModulePage module="bom" />} />
 
     <Route path="/staff/tables" element={<StaffTablesPage />} />
     <Route path="/staff/order/:tableId" element={<StaffOrderPage />} />

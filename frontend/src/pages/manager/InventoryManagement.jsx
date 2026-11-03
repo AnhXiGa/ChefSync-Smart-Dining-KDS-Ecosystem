@@ -1,34 +1,41 @@
-import { useEffect, useState } from "react";
-import axiosClient from "../api/axiosClient";
+import { useCallback, useEffect, useState } from "react";
+import axiosClient from "../../api/axiosClient";
 import "./InventoryManagement.css";
 
-const emptyIngredient = { name: "", unit: "kg", initialStock: 0, minimumStock: 0 };
+const emptyIngredient = { name: "", unit: "kg", initialStock: 0, minimumStock: 0, costPerUnit: "" };
 
 export default function InventoryManagement() {
   const [ingredients, setIngredients] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [bom, setBom] = useState([]);
+  const [products, setProducts] = useState([]);
   const [bomForm, setBomForm] = useState({ productId: "", ingredientId: "", quantity: "" });
-  const [orderId, setOrderId] = useState("9001");
-  const [form, setForm] = useState(emptyIngredient);
+  const [orderId, setOrderId] = useState("");
+  const [form, setForm] = useState({ ...emptyIngredient, costPerUnit: "" });
   const [adjustment, setAdjustment] = useState({ ingredientId: "", quantity: "", note: "" });
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const [ingredientResponse, transactionResponse] = await Promise.all([
+      const [ingredientResponse, transactionResponse, menuResponse] = await Promise.all([
         axiosClient.get("/api/ingredients"),
         axiosClient.get("/api/inventory/transactions"),
+        axiosClient.get("/api/menu"),
       ]);
       setIngredients(ingredientResponse.data);
       setTransactions(transactionResponse.data);
+      setProducts(menuResponse.data.flatMap((category) => category.products ?? []));
       setError("");
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? "Không thể tải dữ liệu kho.");
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // Initial data loading is the external synchronization this effect owns.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
 
   const lowStockCount = ingredients.filter((ingredient) => ingredient.isLowStock).length;
   const totalStockItems = ingredients.length;
@@ -40,6 +47,7 @@ export default function InventoryManagement() {
         ...form,
         initialStock: Number(form.initialStock),
         minimumStock: Number(form.minimumStock),
+        costPerUnit: Number(form.costPerUnit),
       });
       setForm(emptyIngredient);
       await load();
@@ -121,8 +129,9 @@ export default function InventoryManagement() {
           <div className="panel-header"><div><span className="panel-kicker">DANH MỤC KHO</span><h2>Thêm nguyên liệu</h2></div><span className="panel-symbol">＋</span></div>
           <label>Tên nguyên liệu<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label>Đơn vị<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></label>
-          <label>Tồn đầu kỳ<input type="number" min="0" step="0.001" value={form.initialStock} onChange={(e) => setForm({ ...form, initialStock: e.target.value })} /></label>
-          <label>Ngưỡng cảnh báo<input type="number" min="0" step="0.001" value={form.minimumStock} onChange={(e) => setForm({ ...form, minimumStock: e.target.value })} /></label>
+          <label>Tồn đầu kỳ<input type="number"  value={form.initialStock} onChange={(e) => setForm({ ...form, initialStock: e.target.value })} /></label>
+          <label>Ngưỡng cảnh báo<input type="number"  value={form.minimumStock} onChange={(e) => setForm({ ...form, minimumStock: e.target.value })} /></label>
+          <label>Giá<input type="number"  value={form.costPerUnit} onChange={(e) => setForm({ ...form, costPerUnit: e.target.value })} /></label>
           <button type="submit">Lưu nguyên liệu</button>
         </form>
 
@@ -150,12 +159,17 @@ export default function InventoryManagement() {
       <section className="panel inventory-section">
         <div className="section-heading"><div><span className="panel-kicker">CÔNG THỨC MÓN</span><h2>Định lượng món ăn (BOM)</h2></div><span className="section-count">Theo từng phần</span></div>
         <div className="bom-toolbar">
-          <label>Mã món ăn<input type="number" min="1" value={bomForm.productId} onChange={(e) => setBomForm({ ...bomForm, productId: e.target.value })} /></label>
+          <label>Món ăn
+            <select required value={bomForm.productId} onChange={(e) => setBomForm({ ...bomForm, productId: e.target.value })}>
+              <option value="">Chọn món ăn</option>
+              {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+          </label>
           <button type="button" onClick={loadBom}>Xem định lượng</button>
         </div>
         <form className="bom-toolbar" onSubmit={addBomItem}>
           <label>Nguyên liệu<select required value={bomForm.ingredientId} onChange={(e) => setBomForm({ ...bomForm, ingredientId: e.target.value })}><option value="">Chọn nguyên liệu</option>{ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}</select></label>
-          <label>Số lượng / phần<input required type="number" min="0.000001" step="0.001" value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} /></label>
+          <label>Số lượng / phần<input required type="number"  value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} /></label>
           <button type="submit">Thêm vào BOM</button>
         </form>
         <div className="table-wrap"><table className="data-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị kho</th><th>Định lượng / phần</th></tr></thead><tbody>{bom.length === 0 ? <tr><td className="empty-state" colSpan="3">Chưa có định lượng cho món này.</td></tr> : bom.map((item) => <tr key={item.ingredientId}><td className="name-cell">{item.ingredientName}</td><td><span className="unit-pill">{item.unit}</span></td><td className="number-cell">{item.quantity}</td></tr>)}</tbody></table></div>
@@ -170,7 +184,7 @@ export default function InventoryManagement() {
           </label>
           <button type="submit">Accepted và trừ kho</button>
         </form>
-        <p className="test-hint">Dữ liệu mẫu: đơn 9001 gồm 3 phần Phở bò, dự kiến trừ 0.300 kg thịt bò.</p>
+        <p className="test-hint">Chỉ khi đơn chuyển sang Accepted, hệ thống mới nhân số lượng món với BOM và ghi giao dịch xuất kho.</p>
       </section>
 
       <section className="panel inventory-section">

@@ -77,6 +77,11 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    await AccountSeeder.SeedManagerAsync(scope.ServiceProvider);
+}
+
 // =====================================================
 // SWAGGER
 // =====================================================
