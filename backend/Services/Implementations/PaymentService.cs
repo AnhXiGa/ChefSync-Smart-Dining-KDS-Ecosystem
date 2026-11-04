@@ -30,6 +30,7 @@ public class PaymentService : IPaymentService
         CreatePaymentRequest request)
     {
         var order = await _context.Orders
+            .Include(x => x.OrderItems)
             .FirstOrDefaultAsync(x => x.Id == request.OrderId);
 
         if (order == null)
@@ -40,6 +41,16 @@ public class PaymentService : IPaymentService
 
         if (order.Status == "Cancelled")
             throw new Exception("Đơn hàng đã bị hủy.");
+
+        var activeItems = order.OrderItems
+            .Where(item => item.Status != "Cancelled")
+            .ToList();
+
+        if (activeItems.Count == 0)
+            throw new Exception("Đơn hàng không còn món hợp lệ để thanh toán.");
+
+        if (activeItems.Any(item => item.Status != "Served"))
+            throw new Exception("Khách hàng chỉ được thanh toán sau khi đã nhận đủ tất cả món.");
 
         var paymentMethod =
             request.PaymentMethod.Trim();
