@@ -5,11 +5,13 @@ using backend.Models;
 using backend.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace backend.Services.Implementations;
 
 public sealed class KdsService(
     AppDbContext context,
+    IInventoryService inventoryService,
     IHubContext<OrderHub> orderHub) : IKdsService
 {
     private static readonly string[] ActiveOrderStatuses =
@@ -91,6 +93,10 @@ public sealed class KdsService(
         string targetStatus,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+
         var item = await context.OrderItems
             .Include(orderItem => orderItem.Order)
                 .ThenInclude(order => order.Table)
@@ -124,6 +130,16 @@ public sealed class KdsService(
 
         if (item.Status != normalizedTarget)
         {
+            if (normalizedTarget == "Ready")
+            {
+                await inventoryService.DeductForOrderItemAsync(
+                    item.OrderId,
+                    item.Id,
+                    item.ProductId,
+                    item.Quantity,
+                    cancellationToken);
+            }
+
             item.Status = normalizedTarget;
             var now = DateTime.UtcNow;
 
@@ -134,6 +150,8 @@ public sealed class KdsService(
 
             await context.SaveChangesAsync(cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         var response = MapOrderItem(item, item.Order);
         await Task.WhenAll(

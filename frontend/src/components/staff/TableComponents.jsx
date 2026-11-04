@@ -5,7 +5,7 @@ const formatDateTime = (value) => value
   ? new Date(value).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })
   : "—";
 
-export function TableCard({ table, selected, onClick }) {
+export function TableCard({ table, selected, onClick, reservation = {} }) {
   const label =
     table.status === "occupied"
       ? "Có khách"
@@ -34,7 +34,7 @@ export function TableCard({ table, selected, onClick }) {
       <StatusBadge kind={kind}>{label}</StatusBadge>
       <p>
         {table.status === "reserved"
-          ? "18:00 · Chị Lan"
+          ? reservation.name?.trim() || "Chưa có tên người đặt"
           : table.status === "maintenance"
             ? "Đang sửa ghế"
             : table.status === "empty"

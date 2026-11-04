@@ -33,7 +33,7 @@ export const navigationGroups = [
     title: 'QUẢN TRỊ',
     items: [
       ['overview', '⌁', 'Tổng quan', '/manager'],
-      ['expenses', '₫', 'Quản lý chi tiêu', '/manager/expenses'],
+      ['expenses', '▥', 'Báo cáo tài chính', '/manager/expenses'],
       ['users', '♙', 'Người dùng & quyền', '/manager/users'],
       ['reports', '▥', 'Báo cáo'],
     ],

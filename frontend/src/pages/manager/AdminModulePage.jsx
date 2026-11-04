@@ -7,6 +7,7 @@ import {
 import { adminModules } from "../../data/adminData";
 import axiosClient from "../../api/axiosClient";
 import "./InventoryMovements.css";
+import FinancialReportModule from "./FinancialReportModule";
 
 const inventoryModules = new Set(["inventory", "bom"]);
 function getError(error, fallback) {
@@ -369,7 +370,7 @@ function InventoryMovementsModule({ config }) {
   );
 }
 
-function MenuManagementModule({ config }) {
+export function LegacyMenuManagementModule({ config }) {
   const [categories, setCategories] = useState([]);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
@@ -444,6 +445,144 @@ function MenuManagementModule({ config }) {
           ))}
         </div>
       </section>
+    </>
+  );
+}
+
+function MenuManagementModule({ config }) {
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [query, setQuery] = useState("");
+  const [categoryId, setCategoryId] = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [updatingProductId, setUpdatingProductId] = useState(null);
+  const [form, setForm] = useState({ categoryId: "", name: "", description: "", price: "", imageUrl: "", preparationTime: "", isAvailable: true });
+
+  const loadMenu = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (query.trim()) params.search = query.trim();
+      if (categoryId !== "ALL") params.categoryId = categoryId;
+      const [productsResponse, categoriesResponse] = await Promise.all([
+        axiosClient.get("/api/products", { params }),
+        axiosClient.get("/api/categories"),
+      ]);
+      setProducts(productsResponse.data);
+      setCategories(categoriesResponse.data);
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải danh sách món ăn."));
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryId, query]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadMenu(), 250);
+    return () => window.clearTimeout(timer);
+  }, [loadMenu]);
+
+  const startCreate = () => {
+    setEditing("new");
+    setForm({ categoryId: categories[0]?.id ? String(categories[0].id) : "", name: "", description: "", price: "", imageUrl: "", preparationTime: "", isAvailable: true });
+    setError("");
+  };
+
+  const startEdit = (product) => {
+    setEditing(product.id);
+    setForm({ categoryId: String(product.categoryId), name: product.name, description: product.description || "", price: String(product.price), imageUrl: product.imageUrl || "", preparationTime: product.preparationTime ? String(product.preparationTime) : "", isAvailable: product.isAvailable });
+    setError("");
+  };
+
+  const saveProduct = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const payload = { ...form, categoryId: Number(form.categoryId), price: Number(form.price), preparationTime: form.preparationTime ? Number(form.preparationTime) : null };
+    try {
+      if (editing === "new") await axiosClient.post("/api/products", payload);
+      else await axiosClient.put(`/api/products/${editing}`, payload);
+      setEditing(null);
+      await loadMenu();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể lưu món ăn."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleAvailability = async (product) => {
+    setUpdatingProductId(product.id);
+    setError("");
+    try {
+      await axiosClient.patch(`/api/products/${product.id}/availability`, { isAvailable: !product.isAvailable });
+      await loadMenu();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể thay đổi trạng thái món ăn."));
+    } finally {
+      setUpdatingProductId(null);
+    }
+  };
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} action={<button className="primary" type="button" onClick={startCreate} disabled={categories.length === 0}>+ Thêm món ăn</button>} />
+      <div className="module-toolbar menu-toolbar">
+        <div className="search"><input placeholder="Tìm tên món ăn..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} aria-label="Lọc theo danh mục">
+          <option value="ALL">Tất cả danh mục</option>
+          {categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
+        </select>
+        <button className="secondary" type="button" onClick={() => void loadMenu()}>Làm mới</button>
+      </div>
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <section className="data-card">
+        <div className="data-card-head">
+          <div><strong>{loading ? "Đang tải..." : `${products.length} món ăn`}</strong><p>Danh sách gồm cả món đang bán và món đang ẩn</p></div>
+          <StatusBadge>{loading ? "Đang tải" : "Đang đồng bộ"}</StatusBadge>
+        </div>
+        <div className="data-table menu-data-table">
+          <div className="data-row data-header"><span>Món ăn</span><span>Danh mục</span><span>Giá bán</span><span>Thời gian</span><span>Trạng thái</span><span>Thao tác</span></div>
+          {!loading && products.length === 0 && <div className="menu-empty">Không tìm thấy món ăn phù hợp.</div>}
+          {products.map((product) => (
+            <div className="data-row" key={product.id}>
+              <span className="menu-product-cell">
+                {product.imageUrl ? <img src={product.imageUrl} alt="" className="menu-product-image" /> : <span className="menu-product-placeholder" aria-hidden="true">🍽</span>}
+                <span><strong>{product.name}</strong>{product.description && <small>{product.description}</small>}</span>
+              </span>
+              <span>{product.categoryName}</span>
+              <span>{new Intl.NumberFormat("vi-VN").format(product.price)} ₫</span>
+              <span>{product.preparationTime ? `${product.preparationTime} phút` : "—"}</span>
+              <span><StatusBadge kind={product.isAvailable ? "green" : "gray"}>{product.isAvailable ? "Đang bán" : "Đang ẩn"}</StatusBadge></span>
+              <span className="menu-product-actions">
+                <button type="button" className="row-action" onClick={() => startEdit(product)}>Sửa</button>
+                <button type="button" className="row-action" onClick={() => void toggleAvailability(product)} disabled={updatingProductId === product.id}>
+                  {updatingProductId === product.id ? "Đang lưu..." : product.isAvailable ? "Ẩn" : "Hiện"}
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+      {editing !== null && (
+        <section className="data-card category-form-card product-form-card">
+          <div className="data-card-head"><strong>{editing === "new" ? "Thêm món ăn" : "Chỉnh sửa món ăn"}</strong><button className="row-action" type="button" onClick={() => setEditing(null)}>Đóng</button></div>
+          <form className="product-form" onSubmit={saveProduct}>
+            <label>Tên món<input required maxLength={150} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+            <label>Danh mục<select required value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}><option value="" disabled>Chọn danh mục</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+            <label>Giá bán<input required type="number" min="0" step="1000" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></label>
+            <label>Thời gian chuẩn bị (phút)<input type="number" min="1" max="1440" value={form.preparationTime} onChange={(event) => setForm({ ...form, preparationTime: event.target.value })} /></label>
+            <label className="product-form-wide">Mô tả<textarea maxLength={1000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
+            <label className="product-form-wide">Ảnh (URL)<input type="text" maxLength={500} value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} placeholder="https://..." /></label>
+            <label className="product-availability"><input type="checkbox" checked={form.isAvailable} onChange={(event) => setForm({ ...form, isAvailable: event.target.checked })} /> Hiện món trên thực đơn khách</label>
+            <div className="product-form-actions"><button className="primary" type="submit" disabled={saving || !form.categoryId}>{saving ? "Đang lưu..." : "Lưu món ăn"}</button><button className="secondary" type="button" onClick={() => setEditing(null)}>Hủy</button></div>
+          </form>
+        </section>
+      )}
     </>
   );
 }
@@ -1156,7 +1295,7 @@ export function AdminModulePage({ module }) {
   return (
     <BackofficeLayout role="manager" title="Minh Anh · Quản lý">
       <main className="page admin-module-page">
-        {module === "menu" ? <MenuManagementModule config={config} /> : module === "categories" ? <CategoryManagementModule config={config} /> : module === "users" ? <UsersModule config={config} /> : module === "suppliers" ? <SuppliersModule config={config} /> : module === "purchase-orders" ? <PurchaseOrdersModule config={config} /> : module === "stock-movements" ? <InventoryMovementsModule config={config} /> : inventoryModules.has(module) ? <InventoryModule module={module} config={config} /> : (
+        {module === "menu" ? <MenuManagementModule config={config} /> : module === "categories" ? <CategoryManagementModule config={config} /> : module === "users" ? <UsersModule config={config} /> : module === "suppliers" ? <SuppliersModule config={config} /> : module === "purchase-orders" ? <PurchaseOrdersModule config={config} /> : module === "stock-movements" ? <InventoryMovementsModule config={config} /> : module === "expenses" ? <FinancialReportModule /> : inventoryModules.has(module) ? <InventoryModule module={module} config={config} /> : (
           <>
             <PageTitle title={config.title} description={config.description} action={<button className="primary">{config.action}</button>} />
             <div className="module-toolbar"><div className="search">⌕ <input placeholder="Tìm kiếm..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><button className="secondary">Bộ lọc</button><button className="secondary">Xuất báo cáo</button></div>

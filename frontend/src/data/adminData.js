@@ -39,8 +39,8 @@ export const adminModules = {
     rows: [],
   },
   expenses: {
-    title: "Quản lý chi tiêu",
-    description: "Theo dõi chi phí vận hành, mua hàng và ngân sách nhà hàng.",
+    title: "Báo cáo tài chính",
+    description: "Tổng hợp doanh thu, thanh toán, món bán chạy và giá vốn nguyên liệu.",
     rows: [],
   },
   users: {
