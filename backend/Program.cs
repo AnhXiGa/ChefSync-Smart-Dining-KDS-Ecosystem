@@ -83,8 +83,9 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
-    await SmartPosSeeder.SeedAsync(context);
     await AccountSeeder.SeedManagerAsync(scope.ServiceProvider);
+    await SmartPosSeeder.SeedAsync(context);
+    await SmartPosSeeder.SeedPurchaseOrdersAsync(context);
 }
 
 // =====================================================

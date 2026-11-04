@@ -6,6 +6,7 @@ import { OrderSummary } from "../../components/staff/OrderComponents";
 import { OrderStatusPanel } from "../../components/shared/OrderStatusPanel";
 import { useTableOrderUpdates } from "../../hooks/useTableOrderUpdates";
 import { TableOperationsModal } from "../../components/staff/TableOperationsModal";
+import { cancelPayment } from "../../api/paymentApi";
 
 const money = (value) => `${new Intl.NumberFormat("vi-VN").format(value || 0)} ₫`;
 const cashDenominations = [50000, 100000, 200000, 500000, 1000000];
@@ -22,6 +23,7 @@ export function StaffOrderPage() {
   const [payment, setPayment] = useState(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentBusy, setPaymentBusy] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const orderUpdates = useTableOrderUpdates(tableId);
   const loadOperationsData = useCallback(async () => {
     try {
@@ -40,11 +42,18 @@ export function StaffOrderPage() {
   useEffect(() => {
     void loadOperationsData();
   }, [loadOperationsData]);
-  const activeOrder = orders.find(
+  const activeOrderBase = orders.find(
     (order) =>
       order.tableId === Number(tableId) &&
       !["Completed", "Cancelled"].includes(order.status),
   );
+  const liveOrder = orderUpdates.orders.find((order) => order.id === activeOrderBase?.id);
+  const activeOrder = activeOrderBase
+    ? { ...activeOrderBase, items: liveOrder?.items || activeOrderBase.items }
+    : null;
+  const activeItems = activeOrder?.items?.filter((item) => item.status !== "Cancelled") || [];
+  const allItemsServed = activeItems.length > 0 &&
+    activeItems.every((item) => item.status === "Served");
   const received = Number(receivedAmount);
   const cashAmountValid =
     Number.isFinite(received) &&
@@ -60,6 +69,10 @@ export function StaffOrderPage() {
   const createPayment = async () => {
     if (!activeOrder) {
       setError("Bàn chưa có đơn cần thanh toán.");
+      return;
+    }
+    if (!allItemsServed) {
+      setError("Chưa thể thanh toán: bếp chưa xác nhận phục vụ đủ tất cả món.");
       return;
     }
 
@@ -92,6 +105,20 @@ export function StaffOrderPage() {
       setError(requestError.response?.data?.message || "Không thể xác nhận thanh toán.");
     } finally {
       setPaymentBusy(false);
+    }
+  };
+  const cancelPendingPayment = async () => {
+    if (!payment?.id || payment.status !== "Pending") return;
+    setCancelBusy(true);
+    setError("");
+    try {
+      await cancelPayment(payment.id);
+      setPayment(null);
+      await loadOperationsData();
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Không thể hủy thanh toán.");
+    } finally {
+      setCancelBusy(false);
     }
   };
   return (
@@ -144,10 +171,14 @@ export function StaffOrderPage() {
             cart={[]}
             total={0}
             onPayment={() => {
-              setPayment(null);
-              setPaymentOpen(true);
+              navigate(`/staff/checkout?tableId=${tableId}`);
             }}
-            paymentDisabled={!activeOrder}
+            paymentDisabled={!activeOrder || !allItemsServed}
+            paymentHint={
+              activeOrder && !allItemsServed
+                ? "Chưa thể thanh toán: chờ bếp xác nhận đã phục vụ đủ món."
+                : ""
+            }
             existingOrder={activeOrder}
           />
         </div>
@@ -260,6 +291,15 @@ export function StaffOrderPage() {
             {payment?.status === "Pending" && paymentMethod === "Cash" && (
               <button className="primary full" onClick={confirmCashPayment} disabled={paymentBusy}>
                 {paymentBusy ? "Đang xác nhận…" : "Xác nhận đã thu tiền"}
+              </button>
+            )}
+            {payment?.status === "Pending" && (
+              <button
+                className="secondary full"
+                onClick={() => void cancelPendingPayment()}
+                disabled={paymentBusy || cancelBusy}
+              >
+                {cancelBusy ? "Đang hủy…" : "Hủy thanh toán"}
               </button>
             )}
             {!payment?.id && (

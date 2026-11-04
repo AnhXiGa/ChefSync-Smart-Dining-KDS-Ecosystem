@@ -36,11 +36,21 @@ public class PaymentService : IPaymentService
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        if (order.Status == "Completed")
-            throw new Exception("Đơn hàng đã hoàn thành.");
-
         if (order.Status == "Cancelled")
             throw new Exception("Đơn hàng đã bị hủy.");
+
+        var paymentMethod = request.PaymentMethod.Trim();
+
+        if (paymentMethod != "Cash" &&
+            paymentMethod != "BankTransfer")
+        {
+            throw new Exception(
+                "Phương thức thanh toán không hợp lệ. " +
+                "Chỉ hỗ trợ Cash hoặc BankTransfer.");
+        }
+
+        if (order.Status == "Completed")
+            throw new Exception("Đơn hàng đã hoàn thành.");
 
         var activeItems = order.OrderItems
             .Where(item => item.Status != "Cancelled")
@@ -52,15 +62,35 @@ public class PaymentService : IPaymentService
         if (activeItems.Any(item => item.Status != "Served"))
             throw new Exception("Khách hàng chỉ được thanh toán sau khi đã nhận đủ tất cả món.");
 
-        var paymentMethod =
-            request.PaymentMethod.Trim();
+        var existingPayment = await _context.Payments
+            .Where(payment =>
+                payment.OrderId == order.Id &&
+                (payment.Status == "Pending" || payment.Status == "Paid"))
+            .OrderByDescending(payment => payment.Status == "Paid")
+            .ThenByDescending(payment => payment.CreatedAt)
+            .FirstOrDefaultAsync();
 
-        if (paymentMethod != "Cash" &&
-            paymentMethod != "BankTransfer")
+        if (existingPayment != null)
         {
-            throw new Exception(
-                "Phương thức thanh toán không hợp lệ. " +
-                "Chỉ hỗ trợ Cash hoặc BankTransfer.");
+            if (existingPayment.Status == "Paid")
+            {
+                return MapToResponse(existingPayment);
+            }
+
+            if (paymentMethod == "BankTransfer")
+            {
+                existingPayment.PaymentMethod = "BankTransfer";
+                existingPayment.ReceivedAmount = null;
+                existingPayment.ChangeAmount = null;
+                existingPayment.TransferContent ??= GenerateTransferContent(order.Id);
+                existingPayment.QrCodeUrl ??= GenerateVietQrUrl(
+                    order.TotalAmount,
+                    existingPayment.TransferContent);
+
+                await _context.SaveChangesAsync();
+            }
+
+            return MapToResponse(existingPayment);
         }
 
         // =====================================================
@@ -121,31 +151,6 @@ public class PaymentService : IPaymentService
         // BANK TRANSFER
         // =====================================================
 
-        var existingPayment = await _context.Payments
-            .FirstOrDefaultAsync(x =>
-                x.OrderId == order.Id &&
-                x.PaymentMethod == "BankTransfer" &&
-                x.Status == "Pending");
-
-        if (existingPayment != null)
-        {
-            if (!existingPayment.TransferContent?
-                    .StartsWith("peo-", StringComparison.OrdinalIgnoreCase)
-                ?? true)
-            {
-                existingPayment.TransferContent =
-                    GenerateTransferContent(order.Id);
-                existingPayment.QrCodeUrl =
-                    GenerateVietQrUrl(
-                        order.TotalAmount,
-                        existingPayment.TransferContent);
-
-                await _context.SaveChangesAsync();
-            }
-
-            return MapToResponse(existingPayment);
-        }
-
         var transferContent =
             GenerateTransferContent(order.Id);
 
@@ -204,6 +209,7 @@ public class PaymentService : IPaymentService
         var payment = await _context.Payments
             .AsNoTracking()
             .Where(x => x.OrderId == orderId)
+            .OrderByDescending(x => x.Status == "Paid")
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -215,11 +221,27 @@ public class PaymentService : IPaymentService
 
     public async Task<List<PaymentHistoryResponse>> GetHistoryAsync()
     {
-        return await _context.Payments
+        var stalePendingPayments = await _context.Payments
+            .Where(payment =>
+                payment.Status == "Pending" &&
+                payment.Order.Payments.Any(other =>
+                    other.Status == "Paid"))
+            .ToListAsync();
+
+        if (stalePendingPayments.Count > 0)
+        {
+            foreach (var payment in stalePendingPayments)
+            {
+                payment.Status = "Cancelled";
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        var history = await _context.Payments
             .AsNoTracking()
             .Include(payment => payment.Order)
             .ThenInclude(order => order.Table)
-            .OrderByDescending(payment => payment.CreatedAt)
             .Select(payment => new PaymentHistoryResponse
             {
                 Id = payment.Id,
@@ -234,6 +256,15 @@ public class PaymentService : IPaymentService
                 CreatedAt = payment.CreatedAt
             })
             .ToListAsync();
+
+        return history
+            .GroupBy(payment => payment.OrderId)
+            .Select(group => group
+                .OrderByDescending(payment => payment.Status == "Paid")
+                .ThenByDescending(payment => payment.CreatedAt)
+                .First())
+            .OrderByDescending(payment => payment.CreatedAt)
+            .ToList();
     }
 
     // =========================================================
@@ -251,6 +282,8 @@ public class PaymentService : IPaymentService
             var payment = await _context.Payments
                 .Include(x => x.Order)
                 .ThenInclude(x => x.Table)
+                .Include(x => x.Order)
+                .ThenInclude(x => x.OrderItems)
                 .FirstOrDefaultAsync(x => x.Id == paymentId);
 
             if (payment == null)
@@ -267,6 +300,14 @@ public class PaymentService : IPaymentService
             if (payment.Status == "Cancelled")
                 throw new Exception(
                     "Giao dịch đã bị hủy.");
+
+            var activeItems = payment.Order.OrderItems
+                .Where(item => item.Status != "Cancelled")
+                .ToList();
+
+            if (activeItems.Count == 0 || activeItems.Any(item => item.Status != "Served"))
+                throw new Exception(
+                    "Chỉ được thanh toán sau khi bếp đã phục vụ đủ tất cả món.");
 
             if (!payment.ReceivedAmount.HasValue)
                 throw new Exception(
@@ -287,6 +328,10 @@ public class PaymentService : IPaymentService
             // Mã nội bộ cho giao dịch tiền mặt
             payment.TransactionCode =
                 $"CASH-{payment.Id}";
+
+            await CancelOtherPendingPaymentsAsync(
+                payment.OrderId,
+                payment.Id);
 
             payment.Order.Status = "Completed";
 
@@ -379,6 +424,8 @@ public class PaymentService : IPaymentService
             await _context.Payments
                 .Include(x => x.Order)
             .ThenInclude(x => x.Table)
+                .Include(x => x.Order)
+            .ThenInclude(x => x.OrderItems)
             .Where(x =>
                     x.PaymentMethod == "BankTransfer" &&
                     x.Status == "Pending")
@@ -415,6 +462,13 @@ public class PaymentService : IPaymentService
         if (payment == null)
             return false;
 
+        var activeItems = payment.Order.OrderItems
+            .Where(item => item.Status != "Cancelled")
+            .ToList();
+
+        if (activeItems.Count == 0 || activeItems.Any(item => item.Status != "Served"))
+            return false;
+
         // Kiểm tra số tiền
         if (request.TransferAmount != payment.Amount)
         {
@@ -448,6 +502,10 @@ public class PaymentService : IPaymentService
 
             payment.PaidAt =
                 DateTime.UtcNow;
+
+            await CancelOtherPendingPaymentsAsync(
+                payment.OrderId,
+                payment.Id);
 
             payment.Order.Status =
                 "Completed";
@@ -550,6 +608,23 @@ public class PaymentService : IPaymentService
         }
 
         return builder.ToString();
+    }
+
+    private async Task CancelOtherPendingPaymentsAsync(
+        int orderId,
+        int paidPaymentId)
+    {
+        var pendingPayments = await _context.Payments
+            .Where(payment =>
+                payment.OrderId == orderId &&
+                payment.Id != paidPaymentId &&
+                payment.Status == "Pending")
+            .ToListAsync();
+
+        foreach (var payment in pendingPayments)
+        {
+            payment.Status = "Cancelled";
+        }
     }
 
     // =========================================================

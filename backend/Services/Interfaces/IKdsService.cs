@@ -4,7 +4,9 @@ namespace backend.Services.Interfaces;
 
 public interface IKdsService
 {
-    Task<IReadOnlyList<KdsOrderResponse>> GetOrdersAsync(
+    Task<KdsOrdersPageResponse> GetOrdersAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<KdsOrderItemResponse>> GetOrderItemsAsync(

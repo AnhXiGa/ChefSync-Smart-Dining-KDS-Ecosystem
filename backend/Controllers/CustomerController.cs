@@ -3,6 +3,7 @@ using backend.DTOs;
 using backend.DTOs.Kds;
 using backend.Hubs;
 using backend.Models;
+using backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -15,11 +16,16 @@ public sealed class CustomerController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IHubContext<OrderHub> _orderHub;
+    private readonly INotificationService _notificationService;
 
-    public CustomerController(AppDbContext context, IHubContext<OrderHub> orderHub)
+    public CustomerController(
+        AppDbContext context,
+        IHubContext<OrderHub> orderHub,
+        INotificationService notificationService)
     {
         _context = context;
         _orderHub = orderHub;
+        _notificationService = notificationService;
     }
 
     [HttpGet("verify-table/{qrToken}")]
@@ -200,6 +206,72 @@ public sealed class CustomerController : ControllerBase
         return Ok(orders);
     }
 
+    [HttpGet("notifications")]
+    public async Task<IActionResult> GetCustomerNotifications(
+        [FromQuery] string qrToken,
+        CancellationToken cancellationToken)
+    {
+        var table = await FindTableByQrTokenAsync(qrToken, cancellationToken);
+        if (table is null)
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        return Ok(await _notificationService.GetCustomerNotificationsAsync(
+            table.Id,
+            cancellationToken));
+    }
+
+    [HttpPatch("notifications/{id:int}/read")]
+    public async Task<IActionResult> MarkCustomerNotificationAsRead(
+        int id,
+        [FromQuery] string qrToken,
+        CancellationToken cancellationToken)
+    {
+        var table = await FindTableByQrTokenAsync(qrToken, cancellationToken);
+        if (table is null)
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        var notification = await _notificationService.MarkCustomerNotificationAsReadAsync(
+            id,
+            table.Id,
+            cancellationToken);
+        return notification is null ? NotFound() : Ok(notification);
+    }
+
+    [HttpPost("call-staff")]
+    public async Task<IActionResult> CallStaff(
+        [FromQuery] string qrToken,
+        [FromQuery] string requestType,
+        CancellationToken cancellationToken)
+    {
+        var table = await FindTableByQrTokenAsync(qrToken, cancellationToken);
+        if (table is null)
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        var (title, message) = requestType switch
+        {
+            "assistance" => (
+                "Khách cần nhân viên hỗ trợ",
+                $"Khách tại bàn {table.TableNumber} đang cần hỗ trợ."),
+            "payment" => (
+                "Khách yêu cầu thanh toán",
+                $"Khách tại bàn {table.TableNumber} yêu cầu nhân viên hỗ trợ thanh toán."),
+            _ => (null, null)
+        };
+        if (title is null || message is null)
+            return BadRequest(new { message = "Loại yêu cầu không hợp lệ." });
+
+        await _notificationService.CreateForRolesAsync(
+            ["Waiter", "Manager", "Admin"],
+            title,
+            message,
+            "StaffCall",
+            "Table",
+            table.Id,
+            cancellationToken);
+
+        return Ok(new { message = "Đã gửi yêu cầu đến nhân viên." });
+    }
+
     [HttpPost("orders/items/{itemId:int}/cancel")]
     public async Task<IActionResult> CancelCustomerOrderItem(
         int itemId,
@@ -278,6 +350,14 @@ public sealed class CustomerController : ControllerBase
                 ? new DateTimeOffset(DateTime.SpecifyKind(item.ReadyAt.Value, DateTimeKind.Utc))
                 : null);
 
+        await _notificationService.CreateForRolesAsync(
+            ["Chef"],
+            "Khách đã hủy món",
+            $"Bàn {table.TableNumber} đã hủy {item.Quantity} × {item.ProductName}.",
+            "OrderCancelled",
+            "OrderItem",
+            item.Id,
+            cancellationToken);
         await Task.WhenAll(
             _orderHub.Clients
                 .Group(OrderHub.GetOrderGroup(order.Id))
@@ -300,7 +380,9 @@ public sealed class CustomerController : ControllerBase
     }
 
     [HttpPost("orders")]
-    public async Task<IActionResult> PlaceOrder([FromBody] CreateOrderRequestDto request)
+    public async Task<IActionResult> PlaceOrder(
+        [FromBody] CreateOrderRequestDto request,
+        CancellationToken cancellationToken)
     {
         if (request == null)
             return BadRequest(new { message = "Dữ liệu đặt món không hợp lệ." });
@@ -402,14 +484,17 @@ public sealed class CustomerController : ControllerBase
                 };
                 _context.Orders.Add(order);
             }
-            else if (!string.IsNullOrWhiteSpace(request.Note))
+            else if (order is not null && !string.IsNullOrWhiteSpace(request.Note))
             {
                 order.Note = string.IsNullOrWhiteSpace(order.Note)
                     ? request.Note
                     : $"{order.Note}\n{request.Note}";
             }
 
-            var existingSubtotal = order.OrderItems
+            var activeOrder = order
+                ?? throw new InvalidOperationException("Không thể tạo đơn hàng.");
+
+            var existingSubtotal = activeOrder.OrderItems
                 .Where(orderItem => orderItem.Status != "Cancelled")
                 .Sum(orderItem => orderItem.Subtotal);
             decimal subtotal = existingSubtotal;
@@ -425,7 +510,7 @@ public sealed class CustomerController : ControllerBase
                 var itemSubtotal = product.Price * item.Quantity;
                 subtotal += itemSubtotal;
 
-                order.OrderItems.Add(new OrderItem
+                activeOrder.OrderItems.Add(new OrderItem
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
@@ -438,24 +523,58 @@ public sealed class CustomerController : ControllerBase
                 });
             }
 
-            order.Subtotal = subtotal;
-            order.Discount = 0;
-            order.Tax = subtotal * 0.08m;
-            order.TotalAmount = order.Subtotal + order.Tax - order.Discount;
-            order.UpdatedAt = DateTime.UtcNow;
+            activeOrder.Subtotal = subtotal;
+            activeOrder.Discount = 0;
+            activeOrder.Tax = subtotal * 0.08m;
+            activeOrder.TotalAmount = activeOrder.Subtotal + activeOrder.Tax - activeOrder.Discount;
+            activeOrder.UpdatedAt = DateTime.UtcNow;
+
+            if (table.Status != "Occupied")
+            {
+                table.OccupiedAt = DateTime.UtcNow;
+            }
 
             table.Status = "Occupied";
+            table.VacatedAt = null;
             table.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            await _notificationService.CreateForTableAsync(
+                table.Id,
+                "Đã nhận đơn gọi món",
+                $"Đơn {activeOrder.OrderCode} của bạn đã được gửi đến bếp.",
+                "Order",
+                "Order",
+                activeOrder.Id,
+                cancellationToken);
+            await _notificationService.CreateForRolesAsync(
+                ["Chef"],
+                "Có món mới cần chế biến",
+                $"Bàn {table.TableNumber} vừa gửi món trong đơn {activeOrder.OrderCode}.",
+                "Order",
+                "Order",
+                activeOrder.Id,
+                cancellationToken);
+            await _notificationService.CreateForRolesAsync(
+                ["Manager", "Admin"],
+                "Có đơn gọi món mới",
+                $"Bàn {table.TableNumber} vừa gửi món trong đơn {activeOrder.OrderCode}.",
+                "Order",
+                "Order",
+                activeOrder.Id,
+                cancellationToken);
+            await _orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync("KdsOrdersChanged", cancellationToken);
+
             return Ok(new
             {
                 message = "Đặt món thành công!",
-                orderId = order.Id,
-                orderCode = order.OrderCode,
-                totalAmount = order.TotalAmount
+                orderId = activeOrder.Id,
+                orderCode = activeOrder.OrderCode,
+                totalAmount = activeOrder.TotalAmount
             });
         }
         catch (Exception ex)
@@ -463,5 +582,17 @@ public sealed class CustomerController : ControllerBase
             await transaction.RollbackAsync();
             return StatusCode(500, new { message = "Lỗi hệ thống khi tạo đơn hàng.", detail = ex.Message });
         }
+    }
+
+    private Task<RestaurantTable?> FindTableByQrTokenAsync(
+        string? qrToken,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(qrToken, out var token))
+            return Task.FromResult<RestaurantTable?>(null);
+
+        return _context.RestaurantTables.FirstOrDefaultAsync(
+            table => table.QrToken == token,
+            cancellationToken);
     }
 }

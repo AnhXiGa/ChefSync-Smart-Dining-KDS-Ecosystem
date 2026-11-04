@@ -25,6 +25,11 @@ export async function confirmCashPayment(paymentId) {
   return data;
 }
 
+export async function cancelPayment(paymentId) {
+  const { data } = await axiosClient.post(`/api/payments/${paymentId}/cancel`);
+  return data;
+}
+
 export async function getPaymentHistory() {
   const { data } = await axiosClient.get("/api/payments");
   return data;

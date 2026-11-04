@@ -181,6 +181,8 @@ public class AppDbContext : DbContext
                 .WithMany(x => x.Notifications)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.TableId);
         });
 
 
@@ -638,6 +640,10 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(x => x.TransactionCode)
                 .IsUnique();
+
+            entity.HasIndex(x => x.OrderId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('Pending', 'Paid')");
 
 
             // -------------------------------------------------
