@@ -1,7 +1,10 @@
 using backend.Data;
 using backend.DTOs;
+using backend.DTOs.Kds;
+using backend.Hubs;
 using backend.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
@@ -11,10 +14,12 @@ namespace backend.Controllers;
 public sealed class CustomerController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IHubContext<OrderHub> _orderHub;
 
-    public CustomerController(AppDbContext context)
+    public CustomerController(AppDbContext context, IHubContext<OrderHub> orderHub)
     {
         _context = context;
+        _orderHub = orderHub;
     }
 
     [HttpGet("verify-table/{qrToken}")]
@@ -98,6 +103,150 @@ public sealed class CustomerController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("orders")]
+    public async Task<IActionResult> GetCustomerOrders([FromQuery] string qrToken)
+    {
+        if (!Guid.TryParse(qrToken, out var tokenGuid))
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        var table = await _context.RestaurantTables
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.QrToken == tokenGuid);
+
+        if (table == null)
+            return NotFound(new { message = "Không tìm thấy bàn từ mã QR này." });
+
+        var orders = await _context.Orders
+            .AsNoTracking()
+            .Where(order => order.TableId == table.Id &&
+                order.Status != "Completed" && order.Status != "Cancelled")
+            .OrderByDescending(order => order.CreatedAt)
+            .Select(order => new
+            {
+                order.Id,
+                order.OrderCode,
+                order.Status,
+                order.CreatedAt,
+                order.TotalAmount,
+                Items = order.OrderItems
+                    .OrderBy(item => item.CreatedAt)
+                    .Select(item => new
+                    {
+                        item.Id,
+                        item.ProductName,
+                        item.Quantity,
+                        item.UnitPrice,
+                        item.Subtotal,
+                        item.Note,
+                        item.Status,
+                        CanCancel = item.Status == "Pending" || item.Status == "Accepted"
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+
+        return Ok(orders);
+    }
+
+    [HttpPost("orders/items/{itemId:int}/cancel")]
+    public async Task<IActionResult> CancelCustomerOrderItem(
+        int itemId,
+        [FromQuery] string qrToken,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(qrToken, out var tokenGuid))
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        var item = await _context.OrderItems
+            .Include(orderItem => orderItem.Order)
+                .ThenInclude(order => order.Table)
+            .Include(orderItem => orderItem.Order)
+                .ThenInclude(order => order.OrderItems)
+            .FirstOrDefaultAsync(
+                orderItem => orderItem.Id == itemId &&
+                    orderItem.Order.Table.QrToken == tokenGuid,
+                cancellationToken);
+
+        if (item == null)
+            return NotFound(new { message = "Không tìm thấy món trong đơn của bàn này." });
+
+        if (item.Status is not ("Pending" or "Accepted"))
+            return Conflict(new
+            {
+                message = "Món đã bắt đầu chế biến nên không thể tự hủy."
+            });
+
+        var order = item.Order;
+        var table = order.Table;
+        item.Status = "Cancelled";
+        order.UpdatedAt = DateTime.UtcNow;
+
+        var activeItems = order.OrderItems
+            .Where(orderItem => orderItem.Status != "Cancelled")
+            .ToList();
+        order.Subtotal = activeItems.Sum(orderItem => orderItem.Subtotal);
+        order.Tax = order.Subtotal * 0.08m;
+        order.TotalAmount = Math.Max(0, order.Subtotal + order.Tax - order.Discount);
+
+        if (activeItems.Count == 0)
+        {
+            order.Status = "Cancelled";
+            var hasOtherActiveOrders = await _context.Orders.AnyAsync(
+                otherOrder => otherOrder.TableId == table.Id &&
+                    otherOrder.Id != order.Id &&
+                    otherOrder.Status != "Completed" &&
+                    otherOrder.Status != "Cancelled" &&
+                    otherOrder.OrderItems.Any(orderItem => orderItem.Status != "Cancelled"),
+                cancellationToken);
+
+            if (!hasOtherActiveOrders)
+            {
+                table.Status = "Available";
+                table.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var response = new KdsOrderItemResponse(
+            item.Id,
+            order.Id,
+            order.OrderCode,
+            table.TableNumber,
+            item.ProductId,
+            item.ProductName,
+            item.Quantity,
+            item.Note,
+            item.Status,
+            new DateTimeOffset(DateTime.SpecifyKind(item.CreatedAt, DateTimeKind.Utc)),
+            item.StartedAt.HasValue
+                ? new DateTimeOffset(DateTime.SpecifyKind(item.StartedAt.Value, DateTimeKind.Utc))
+                : null,
+            item.ReadyAt.HasValue
+                ? new DateTimeOffset(DateTime.SpecifyKind(item.ReadyAt.Value, DateTimeKind.Utc))
+                : null);
+
+        await Task.WhenAll(
+            _orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(order.Id))
+                .SendAsync("OrderItemStatusChanged", response, cancellationToken),
+            _orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync("OrderItemStatusChanged", response, cancellationToken),
+            _orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync("KdsOrdersChanged", cancellationToken));
+
+        return Ok(new
+        {
+            message = "Đã hủy món.",
+            itemId = item.Id,
+            itemStatus = item.Status,
+            orderStatus = order.Status,
+            tableStatus = table.Status
+        });
+    }
+
     [HttpPost("orders")]
     public async Task<IActionResult> PlaceOrder([FromBody] CreateOrderRequestDto request)
     {
@@ -172,11 +321,8 @@ public sealed class CustomerController : ControllerBase
             order.Tax = subtotal * 0.08m;
             order.TotalAmount = order.Subtotal + order.Tax - order.Discount;
 
-            if (table.Status == "Available")
-            {
-                table.Status = "Occupied";
-                table.UpdatedAt = DateTime.UtcNow;
-            }
+            table.Status = "Occupied";
+            table.UpdatedAt = DateTime.UtcNow;
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();

@@ -328,10 +328,12 @@ button, input, textarea {
 
 .cart-header h3 {
   margin: 0;
-  min-width: 1024px;
+  min-width: 0;
+  flex: 1;
 }
 
 .cart-header button {
+  flex: 0 0 30px;
   border: none;
   background: #f1f5f9;
   border-radius: 50%;
@@ -474,6 +476,80 @@ button, input, textarea {
   border-radius: 12px;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.customer-orders {
+  padding: 16px 16px 0;
+}
+
+.customer-orders .section-title-row {
+  margin-bottom: 10px;
+}
+
+.customer-orders-empty {
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: #fff;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.customer-order-card {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.customer-order-heading,
+.customer-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.customer-order-heading {
+  padding-bottom: 8px;
+  color: #334155;
+}
+
+.customer-order-item {
+  padding: 9px 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.customer-order-item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.customer-order-item strong {
+  font-size: 0.9rem;
+}
+
+.customer-order-item span {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.cancel-order-item {
+  flex: 0 0 auto;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  padding: 7px 10px;
+  background: #fff;
+  color: #b91c1c;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancel-order-item:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 @keyframes spin {

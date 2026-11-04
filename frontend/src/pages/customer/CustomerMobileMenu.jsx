@@ -11,6 +11,16 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 0,
   }).format(value || 0);
 
+const orderItemStatusLabels = {
+  Pending: 'Chờ bếp nhận',
+  Accepted: 'Bếp đã nhận',
+  Confirmed: 'Bếp đã nhận',
+  Preparing: 'Đang chế biến',
+  Ready: 'Sẵn sàng',
+  Served: 'Đã phục vụ',
+  Cancelled: 'Đã hủy',
+};
+
 function CustomerMobileMenu() {
   const [searchParams] = useSearchParams();
   const qrToken = searchParams.get('token') || '';
@@ -26,6 +36,15 @@ function CustomerMobileMenu() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccessCode, setOrderSuccessCode] = useState(null);
+  const [placedOrders, setPlacedOrders] = useState([]);
+  const [cancelingItemId, setCancelingItemId] = useState(null);
+
+  const loadCustomerOrders = async () => {
+    const response = await axios.get(`${API_BASE_URL}/orders`, {
+      params: { qrToken },
+    });
+    setPlacedOrders(response.data || []);
+  };
 
   useEffect(() => {
     const initPage = async () => {
@@ -39,13 +58,15 @@ function CustomerMobileMenu() {
         setLoading(true);
         setError(null);
 
-        const [tableRes, menuRes] = await Promise.all([
+        const [tableRes, menuRes, ordersRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/verify-table/${qrToken}`),
           axios.get(`${API_BASE_URL}/menu`),
+          axios.get(`${API_BASE_URL}/orders`, { params: { qrToken } }),
         ]);
 
         setTableInfo(tableRes.data);
         setCategories(menuRes.data || []);
+        setPlacedOrders(ordersRes.data || []);
       } catch (err) {
         setError(err.response?.data?.message || 'Không thể kết nối đến hệ thống nhà hàng.');
       } finally {
@@ -124,10 +145,28 @@ function CustomerMobileMenu() {
       setCart([]);
       setOrderNote('');
       setIsCartOpen(false);
+      await loadCustomerOrders().catch(() => {});
     } catch (err) {
       alert(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đơn gọi món.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const cancelOrderItem = async (itemId) => {
+    if (!window.confirm('Bạn muốn hủy món này? Chỉ món chưa bắt đầu chế biến mới hủy được.')) return;
+
+    try {
+      setCancelingItemId(itemId);
+      await axios.post(`${API_BASE_URL}/orders/items/${itemId}/cancel`, null, {
+        params: { qrToken },
+      });
+      await loadCustomerOrders().catch(() => {});
+    } catch (err) {
+      alert(err.response?.data?.message || 'Không thể hủy món. Vui lòng tải lại trang.');
+      await loadCustomerOrders().catch(() => {});
+    } finally {
+      setCancelingItemId(null);
     }
   };
 
@@ -201,6 +240,43 @@ function CustomerMobileMenu() {
             Đơn hàng {orderSuccessCode} đã được gửi thành công.
           </div>
         )}
+
+        <section className="customer-orders">
+          <div className="section-title-row">
+            <h2>Đơn của bạn</h2>
+            <span>{placedOrders.length} đơn đang xử lý</span>
+          </div>
+          {placedOrders.length === 0 ? (
+            <p className="customer-orders-empty">Chưa có món nào đang chờ xử lý.</p>
+          ) : (
+            placedOrders.map((order) => (
+              <article className="customer-order-card" key={order.id}>
+                <div className="customer-order-heading">
+                  <strong>{order.orderCode}</strong>
+                  <span>{formatCurrency(order.totalAmount)}</span>
+                </div>
+                {order.items.map((item) => (
+                  <div className="customer-order-item" key={item.id}>
+                    <div>
+                      <strong>{item.quantity} × {item.productName}</strong>
+                      <span>{orderItemStatusLabels[item.status] || item.status}</span>
+                    </div>
+                    {item.canCancel && (
+                      <button
+                        type="button"
+                        className="cancel-order-item"
+                        onClick={() => cancelOrderItem(item.id)}
+                        disabled={cancelingItemId === item.id}
+                      >
+                        {cancelingItemId === item.id ? 'Đang hủy...' : 'Hủy món'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </article>
+            ))
+          )}
+        </section>
 
         <main className="menu-list">
           {filteredCategories.length === 0 ? (

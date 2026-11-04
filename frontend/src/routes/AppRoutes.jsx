@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { canAccessPath, getLandingPath, getStoredUser } from '../auth/roleAccess'
 import { CustomerOrderPage } from '../pages/customer/CustomerOrderPage'
-import CustomerMobileMenu from '../pages/CustomerMobileMenu'
+import CustomerMobileMenu from '../pages/customer/CustomerMobileMenu'
 import { KitchenDashboardPage } from '../pages/kitchen/KitchenDashboardPage'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { AdminModulePage } from '../pages/manager/AdminModulePage'
