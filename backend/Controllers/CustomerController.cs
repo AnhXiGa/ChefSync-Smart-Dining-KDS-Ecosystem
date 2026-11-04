@@ -281,16 +281,38 @@ public sealed class CustomerController : ControllerBase
 
         try
         {
-            var order = new Order
-            {
-                OrderCode = $"ORD-{DateTime.UtcNow:yyyyMMddHHmmss}-{Random.Shared.Next(100, 999)}",
-                TableId = table.Id,
-                Status = "Pending",
-                Note = request.Note,
-                CreatedAt = DateTime.UtcNow
-            };
+            var order = await _context.Orders
+                .Include(existingOrder => existingOrder.OrderItems)
+                .Where(existingOrder => existingOrder.TableId == table.Id &&
+                    existingOrder.Status != "Completed" &&
+                    existingOrder.Status != "Cancelled")
+                .OrderByDescending(existingOrder => existingOrder.CreatedAt)
+                .FirstOrDefaultAsync();
 
-            decimal subtotal = 0;
+            var createdNewOrder = order == null;
+            if (createdNewOrder)
+            {
+                order = new Order
+                {
+                    OrderCode = $"ORD-{DateTime.UtcNow:yyyyMMddHHmmss}-{Random.Shared.Next(100, 999)}",
+                    TableId = table.Id,
+                    Status = "Pending",
+                    Note = request.Note,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Orders.Add(order);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.Note))
+            {
+                order.Note = string.IsNullOrWhiteSpace(order.Note)
+                    ? request.Note
+                    : $"{order.Note}\n{request.Note}";
+            }
+
+            var existingSubtotal = order.OrderItems
+                .Where(orderItem => orderItem.Status != "Cancelled")
+                .Sum(orderItem => orderItem.Subtotal);
+            decimal subtotal = existingSubtotal;
 
             foreach (var item in request.Items)
             {
@@ -320,11 +342,11 @@ public sealed class CustomerController : ControllerBase
             order.Discount = 0;
             order.Tax = subtotal * 0.08m;
             order.TotalAmount = order.Subtotal + order.Tax - order.Discount;
+            order.UpdatedAt = DateTime.UtcNow;
 
             table.Status = "Occupied";
             table.UpdatedAt = DateTime.UtcNow;
 
-            _context.Orders.Add(order);
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
