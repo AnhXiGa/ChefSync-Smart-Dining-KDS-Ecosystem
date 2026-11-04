@@ -1,6 +1,10 @@
 import { formatMoney } from "../../data/posData";
 import { StatusBadge } from "../shared/Ui";
 
+const formatDateTime = (value) => value
+  ? new Date(value).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })
+  : "—";
+
 export function TableCard({ table, selected, onClick }) {
   const label =
     table.status === "occupied"
@@ -24,7 +28,7 @@ export function TableCard({ table, selected, onClick }) {
       onClick={onClick}
     >
       <div className="table-card-head">
-        <strong>Bàn {String(table.id).padStart(2, "0")}</strong>
+        <strong>{table.tableNumber}</strong>
         <span>{table.status === "maintenance" ? "♧" : "▱"}</span>
       </div>
       <StatusBadge kind={kind}>{label}</StatusBadge>
@@ -34,49 +38,115 @@ export function TableCard({ table, selected, onClick }) {
           : table.status === "maintenance"
             ? "Đang sửa ghế"
             : table.status === "empty"
-              ? `${table.guests} chỗ ngồi`
-              : `${table.guests} khách · ${table.minutes} phút`}
+              ? `${table.capacity} chỗ ngồi`
+              : `${table.capacity} chỗ ngồi`}
       </p>
       <b>{table.total ? formatMoney(table.total) : "—"}</b>
     </button>
   );
 }
 
-export function TableDetails({ table, onOpenOrder }) {
+export function TableDetails({
+  table,
+  onOpenOrder,
+  statuses = [],
+  onStatusChange,
+  reservation = {},
+  onReservationChange,
+  reservationSaved = false,
+  reservationEditing = false,
+  onReservationSave,
+  onReservationEdit,
+}) {
   if (!table) return null;
+  const showOccupancyTimes = table.status === "occupied";
+  const showReservationForm = table.apiStatus === "Reserved";
   return (
     <aside className="detail-card">
-      <h2>Bàn {String(table.id).padStart(2, "0")}</h2>
-      <p>Sảnh chính · {table.guests} / 4 chỗ ngồi</p>
+      <h2>{table.tableNumber}</h2>
+      <p>{table.capacity} chỗ ngồi</p>
       <div className="detail-list">
         <div>
           <span>Đơn đang phục vụ</span>
-          <b>{table.total ? `#AN-1410-00${table.id}` : "—"}</b>
+          <b>{table.activeOrder?.orderCode || "Chưa có đơn"}</b>
         </div>
+        {showOccupancyTimes && (
+          <>
+            <div>
+              <span>Vào bàn</span>
+              <b>{formatDateTime(table.occupiedAt || table.activeOrder?.createdAt)}</b>
+            </div>
+            <div>
+              <span>Kết thúc</span>
+              <b>{formatDateTime(table.vacatedAt)}</b>
+            </div>
+          </>
+        )}
         <div>
-          <span>Bắt đầu</span>
-          <b>{table.total ? "12:20" : "—"}</b>
-        </div>
-        <div>
-          <span>Phụ trách</span>
-          <b>Thu Hà</b>
+          <span>Trạng thái</span>
+          {onStatusChange ? (
+            <select
+              className="table-status-select"
+              value={table.apiStatus || "Available"}
+              onChange={(event) => void onStatusChange(table.id, event.target.value)}
+              aria-label={`Cập nhật trạng thái ${table.tableNumber}`}
+            >
+              {statuses.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          ) : (
+            <b>{table.status}</b>
+          )}
         </div>
       </div>
-      {table.total > 0 && (
-        <>
-          <div className="detail-total">
-            <span>Tiền phát sinh</span>
-            <strong>{formatMoney(table.total)}</strong>
+      {showReservationForm && onReservationChange && (
+        <div className="reservation-details">
+          <h3>Thông tin đặt bàn</h3>
+          <label>
+            <span>Tên người đặt</span>
+            <input
+              type="text"
+              value={reservation.name || ""}
+              onChange={(event) => onReservationChange("name", event.target.value)}
+              placeholder="Ví dụ: Nguyễn Văn An"
+              autoComplete="off"
+              disabled={reservationSaved && !reservationEditing}
+            />
+          </label>
+          <label>
+            <span>Số điện thoại</span>
+            <input
+              type="tel"
+              value={reservation.phone || ""}
+              onChange={(event) => onReservationChange("phone", event.target.value)}
+              placeholder="Ví dụ: 0901 234 567"
+              inputMode="tel"
+              autoComplete="off"
+              disabled={reservationSaved && !reservationEditing}
+            />
+          </label>
+          <small>Thông tin chỉ lưu tạm trên trang này.</small>
+          <div className="reservation-actions">
+            {reservationSaved && !reservationEditing ? (
+              <button type="button" className="outline" onClick={onReservationEdit}>
+                Chỉnh sửa
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="primary"
+                onClick={onReservationSave}
+                disabled={!reservation.name?.trim() || !reservation.phone?.trim()}
+              >
+                Lưu thông tin
+              </button>
+            )}
           </div>
-          <small>Chưa gồm ưu đãi và thuế khi thanh toán.</small>
-        </>
+        </div>
       )}
-      <div className="warning">
-        ⚠ Khách gọi nhân viên. Vui lòng kiểm tra tại bàn.
-      </div>
-      <button className="secondary">Tiếp nhận yêu cầu</button>
       <button className="primary full" onClick={onOpenOrder}>
-        Mở bàn & tạo đơn
+        Xem chi tiết bàn
       </button>
     </aside>
   );

@@ -30,7 +30,9 @@ public sealed class TablesController : ApiScaffoldController
                 table.Status,
                 table.QrToken,
                 table.CreatedAt,
-                table.UpdatedAt
+                table.UpdatedAt,
+                table.OccupiedAt,
+                table.VacatedAt
             })
             .ToListAsync();
 
@@ -42,7 +44,9 @@ public sealed class TablesController : ApiScaffoldController
             table.Status,
             QrToken = table.QrToken.ToString("N"),
             table.CreatedAt,
-            table.UpdatedAt
+            table.UpdatedAt,
+            table.OccupiedAt,
+            table.VacatedAt
         }));
     }
 
@@ -57,7 +61,9 @@ public sealed class TablesController : ApiScaffoldController
             table.TableNumber,
             table.Capacity,
             table.Status,
-            QrToken = table.QrToken.ToString("N")
+            QrToken = table.QrToken.ToString("N"),
+            table.OccupiedAt,
+            table.VacatedAt
         });
     }
 
@@ -121,10 +127,20 @@ public sealed class TablesController : ApiScaffoldController
         if (status == null) return BadRequest(new { message = "Trạng thái bàn không hợp lệ." });
         var table = await _context.RestaurantTables.FindAsync(id);
         if (table == null) return NotFound();
+        var previousStatus = table.Status;
         table.Status = status;
         table.UpdatedAt = DateTime.UtcNow;
+        if (status == "Occupied" && previousStatus != "Occupied")
+        {
+            table.OccupiedAt = DateTime.UtcNow;
+            table.VacatedAt = null;
+        }
+        else if (status == "Available" && previousStatus != "Available")
+        {
+            table.VacatedAt = DateTime.UtcNow;
+        }
         await _context.SaveChangesAsync();
-        return Ok(new { table.Id, table.Status });
+        return Ok(new { table.Id, table.Status, table.OccupiedAt, table.VacatedAt });
     }
 
     [HttpDelete("{id:int}")]

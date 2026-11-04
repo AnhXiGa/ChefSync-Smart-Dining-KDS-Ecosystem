@@ -16,6 +16,10 @@ public class RestaurantTable
 
     public DateTime? UpdatedAt { get; set; }
 
+    public DateTime? OccupiedAt { get; set; }
+
+    public DateTime? VacatedAt { get; set; }
+
     // Navigation
     public ICollection<Order> Orders { get; set; }
         = new List<Order>();

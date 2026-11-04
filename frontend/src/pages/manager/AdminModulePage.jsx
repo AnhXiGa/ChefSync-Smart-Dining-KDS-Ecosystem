@@ -12,6 +12,188 @@ function getError(error, fallback) {
   return error.response?.data?.message ?? fallback;
 }
 
+function MenuManagementModule({ config }) {
+  const [categories, setCategories] = useState([]);
+  const [query, setQuery] = useState("");
+  const [categoryId, setCategoryId] = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadMenu = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (query.trim()) params.search = query.trim();
+      if (categoryId !== "ALL") params.categoryId = categoryId;
+      const response = await axiosClient.get("/api/menu", { params });
+      setCategories(response.data);
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải danh sách món ăn."));
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryId, query]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadMenu(), 250);
+    return () => window.clearTimeout(timer);
+  }, [loadMenu]);
+
+  const products = categories.flatMap((category) =>
+    (category.products ?? []).map((product) => ({
+      ...product,
+      categoryName: category.name,
+    })),
+  );
+  const categoryOptions = categories.filter((category) =>
+    (category.products ?? []).length > 0 || category.id === Number(categoryId),
+  );
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} action={<button className="primary" type="button" disabled>＋ Thêm món ăn</button>} />
+      <div className="module-toolbar menu-toolbar">
+        <div className="search">⌕ <input placeholder="Tìm tên món ăn..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} aria-label="Lọc theo danh mục">
+          <option value="ALL">Tất cả danh mục</option>
+          {categoryOptions.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
+        </select>
+        <button className="secondary" type="button" onClick={() => void loadMenu()}>Làm mới</button>
+      </div>
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <section className="data-card">
+        <div className="data-card-head">
+          <div><strong>{loading ? "Đang tải..." : `${products.length} món ăn`}</strong><p>Dữ liệu món ăn và danh mục từ database</p></div>
+          <StatusBadge>{loading ? "Đang tải" : "Đang đồng bộ"}</StatusBadge>
+        </div>
+        <div className="data-table menu-data-table">
+          <div className="data-row data-header"><span>Món ăn</span><span>Danh mục</span><span>Giá bán</span><span>Thời gian</span><span>Trạng thái</span><span /></div>
+          {!loading && products.length === 0 && <div className="menu-empty">Không tìm thấy món ăn phù hợp.</div>}
+          {products.map((product) => (
+            <div className="data-row" key={product.id}>
+              <span className="menu-product-cell">
+                {product.imageUrl
+                  ? <img src={product.imageUrl} alt="" className="menu-product-image" />
+                  : <span className="menu-product-placeholder" aria-hidden="true">🍽</span>}
+                <span><strong>{product.name}</strong>{product.description && <small>{product.description}</small>}</span>
+              </span>
+              <span>{product.categoryName}</span>
+              <span>{new Intl.NumberFormat("vi-VN").format(product.price)} ₫</span>
+              <span>{product.preparationTime ? `${product.preparationTime} phút` : "—"}</span>
+              <span><StatusBadge kind="green">Đang bán</StatusBadge></span>
+              <span />
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function CategoryManagementModule({ config }) {
+  const [categories, setCategories] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: "", description: "", displayOrder: 0, isActive: true });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadCategories = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await axiosClient.get("/api/categories");
+      setCategories(response.data);
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải danh sách danh mục."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const startCreate = () => {
+    setEditing("new");
+    setForm({ name: "", description: "", displayOrder: categories.length + 1, isActive: true });
+  };
+
+  const startEdit = (category) => {
+    setEditing(category.id);
+    setForm({
+      name: category.name,
+      description: category.description || "",
+      displayOrder: category.displayOrder || 0,
+      isActive: category.isActive,
+    });
+  };
+
+  const saveCategory = async (event) => {
+    event.preventDefault();
+    try {
+      const payload = { ...form, displayOrder: Number(form.displayOrder) };
+      if (editing === "new") await axiosClient.post("/api/categories", payload);
+      else await axiosClient.put(`/api/categories/${editing}`, payload);
+      setEditing(null);
+      await loadCategories();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể lưu danh mục."));
+    }
+  };
+
+  const toggleCategory = async (category) => {
+    try {
+      await axiosClient.patch(`/api/categories/${category.id}/status`, { isActive: !category.isActive });
+      await loadCategories();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể cập nhật trạng thái danh mục."));
+    }
+  };
+
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} action={<button className="primary" type="button" onClick={startCreate}>＋ Thêm danh mục</button>} />
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <section className="data-card">
+        <div className="data-card-head">
+          <div><strong>{loading ? "Đang tải..." : `${categories.length} danh mục`}</strong><p>Danh mục đang được đọc từ menu database</p></div>
+          <button className="secondary" type="button" onClick={() => void loadCategories()}>Làm mới</button>
+        </div>
+        <div className="data-table category-data-table">
+          <div className="data-row data-header"><span>Danh mục</span><span>Số món</span><span>Thứ tự</span><span>Trạng thái</span><span>Thao tác</span></div>
+          {!loading && categories.length === 0 && <div className="menu-empty">Chưa có danh mục.</div>}
+          {categories.map((category) => (
+            <div className="data-row" key={category.id}>
+              <span><strong>{category.name}</strong></span>
+              <span>{category.productCount ?? 0} món</span>
+              <span>{category.displayOrder ?? "—"}</span>
+              <span><StatusBadge kind={category.isActive ? "green" : "gray"}>{category.isActive ? "Đang hoạt động" : "Đã tắt"}</StatusBadge></span>
+              <span className="category-actions">
+                <button type="button" className="row-action" onClick={() => startEdit(category)}>Sửa</button>
+                <button type="button" className="row-action" onClick={() => void toggleCategory(category)}>{category.isActive ? "Tắt" : "Bật"}</button>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+      {editing !== null && (
+        <section className="data-card category-form-card">
+          <div className="data-card-head"><strong>{editing === "new" ? "Thêm danh mục" : "Sửa danh mục"}</strong><button className="row-action" type="button" onClick={() => setEditing(null)}>Đóng</button></div>
+          <form className="category-form" onSubmit={saveCategory}>
+            <input required maxLength={100} placeholder="Tên danh mục" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            <input placeholder="Mô tả" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+            <input required type="number" min="0" placeholder="Thứ tự" value={form.displayOrder} onChange={(event) => setForm({ ...form, displayOrder: event.target.value })} />
+            <label><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /> Đang hoạt động</label>
+            <button className="primary" type="submit">Lưu danh mục</button>
+          </form>
+        </section>
+      )}
+    </>
+  );
+}
+
 function InventoryModule({ module, config }) {
   const [ingredients, setIngredients] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -720,7 +902,7 @@ export function AdminModulePage({ module }) {
   return (
     <BackofficeLayout role="manager" title="Minh Anh · Quản lý">
       <main className="page admin-module-page">
-        {module === "users" ? <UsersModule config={config} /> : module === "suppliers" ? <SuppliersModule config={config} /> : module === "stock-in" ? <ReceivedStockModule config={config} /> : module === "purchase-orders" ? <PurchaseOrdersModule config={config} /> : inventoryModules.has(module) ? <InventoryModule module={module} config={config} /> : (
+        {module === "menu" ? <MenuManagementModule config={config} /> : module === "categories" ? <CategoryManagementModule config={config} /> : module === "users" ? <UsersModule config={config} /> : module === "suppliers" ? <SuppliersModule config={config} /> : module === "stock-in" ? <ReceivedStockModule config={config} /> : module === "purchase-orders" ? <PurchaseOrdersModule config={config} /> : inventoryModules.has(module) ? <InventoryModule module={module} config={config} /> : (
           <>
             <PageTitle title={config.title} description={config.description} action={<button className="primary">{config.action}</button>} />
             <div className="module-toolbar"><div className="search">⌕ <input placeholder="Tìm kiếm..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><button className="secondary">Bộ lọc</button><button className="secondary">Xuất báo cáo</button></div>

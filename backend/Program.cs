@@ -43,7 +43,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173",
-                "http://localhost:3000"
+                "http://localhost:3000",
+                "http://172.20.10.2:5173"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -81,6 +82,7 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
+    await SmartPosSeeder.SeedAsync(context);
     await AccountSeeder.SeedManagerAsync(scope.ServiceProvider);
 }
 

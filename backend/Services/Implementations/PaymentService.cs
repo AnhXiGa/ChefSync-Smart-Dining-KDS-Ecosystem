@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System.Text;
 using backend.Configuration;
 using backend.Data;
 using backend.DTOs.Payments;
@@ -118,11 +118,25 @@ public class PaymentService : IPaymentService
 
         if (existingPayment != null)
         {
+            if (!existingPayment.TransferContent?
+                    .StartsWith("peo-", StringComparison.OrdinalIgnoreCase)
+                ?? true)
+            {
+                existingPayment.TransferContent =
+                    GenerateTransferContent(order.Id);
+                existingPayment.QrCodeUrl =
+                    GenerateVietQrUrl(
+                        order.TotalAmount,
+                        existingPayment.TransferContent);
+
+                await _context.SaveChangesAsync();
+            }
+
             return MapToResponse(existingPayment);
         }
 
         var transferContent =
-            GenerateTransferContent(order.OrderCode);
+            GenerateTransferContent(order.Id);
 
         var qrCodeUrl =
             GenerateVietQrUrl(
@@ -188,6 +202,29 @@ public class PaymentService : IPaymentService
         return MapToResponse(payment);
     }
 
+    public async Task<List<PaymentHistoryResponse>> GetHistoryAsync()
+    {
+        return await _context.Payments
+            .AsNoTracking()
+            .Include(payment => payment.Order)
+            .ThenInclude(order => order.Table)
+            .OrderByDescending(payment => payment.CreatedAt)
+            .Select(payment => new PaymentHistoryResponse
+            {
+                Id = payment.Id,
+                OrderId = payment.OrderId,
+                OrderCode = payment.Order.OrderCode,
+                TableNumber = payment.Order.Table.TableNumber,
+                Amount = payment.Amount,
+                PaymentMethod = payment.PaymentMethod,
+                Status = payment.Status,
+                TransactionCode = payment.TransactionCode,
+                PaidAt = payment.PaidAt,
+                CreatedAt = payment.CreatedAt
+            })
+            .ToListAsync();
+    }
+
     // =========================================================
     // CONFIRM CASH
     // =========================================================
@@ -202,6 +239,7 @@ public class PaymentService : IPaymentService
         {
             var payment = await _context.Payments
                 .Include(x => x.Order)
+                .ThenInclude(x => x.Table)
                 .FirstOrDefaultAsync(x => x.Id == paymentId);
 
             if (payment == null)
@@ -242,6 +280,12 @@ public class PaymentService : IPaymentService
             payment.Order.Status = "Completed";
 
             payment.Order.CompletedAt =
+                DateTime.UtcNow;
+
+            payment.Order.Table.Status = "Available";
+            payment.Order.Table.VacatedAt = DateTime.UtcNow;
+
+            payment.Order.Table.UpdatedAt =
                 DateTime.UtcNow;
 
             payment.Order.UpdatedAt =
@@ -323,7 +367,8 @@ public class PaymentService : IPaymentService
         var pendingPayments =
             await _context.Payments
                 .Include(x => x.Order)
-                .Where(x =>
+            .ThenInclude(x => x.Table)
+            .Where(x =>
                     x.PaymentMethod == "BankTransfer" &&
                     x.Status == "Pending")
                 .ToListAsync();
@@ -399,6 +444,13 @@ public class PaymentService : IPaymentService
             payment.Order.CompletedAt =
                 DateTime.UtcNow;
 
+            payment.Order.Table.Status =
+                "Available";
+            payment.Order.Table.VacatedAt = DateTime.UtcNow;
+
+            payment.Order.Table.UpdatedAt =
+                DateTime.UtcNow;
+
             payment.Order.UpdatedAt =
                 DateTime.UtcNow;
 
@@ -420,18 +472,10 @@ public class PaymentService : IPaymentService
     // =========================================================
 
     private string GenerateTransferContent(
-        string orderCode)
+        int orderId)
     {
-        // Ví dụ:
-        // DH20260926001
-
-        var normalized =
-            Regex.Replace(
-                orderCode.ToUpperInvariant(),
-                @"[^A-Z0-9]",
-                "");
-
-        return $"DH{normalized}";
+        // SePay test mode nhận diện mã theo mẫu peo-[6-8 chữ số].
+        return $"peo-{orderId:D8}";
     }
 
     // =========================================================
@@ -476,10 +520,25 @@ public class PaymentService : IPaymentService
             return false;
         }
 
-        return source
-            .ToUpperInvariant()
-            .Contains(
-                paymentCode.ToUpperInvariant());
+        var normalizedSource = NormalizePaymentCode(source);
+        var normalizedPaymentCode = NormalizePaymentCode(paymentCode);
+
+        return normalizedSource.Contains(normalizedPaymentCode);
+    }
+
+    private static string NormalizePaymentCode(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+
+        foreach (var character in value)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(char.ToUpperInvariant(character));
+            }
+        }
+
+        return builder.ToString();
     }
 
     // =========================================================

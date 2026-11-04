@@ -4,6 +4,7 @@
   font-family: Inter, 'Segoe UI', sans-serif;
   color: #1f2937;
   background: #e5e7eb;
+  --focus-ring: 0 0 0 3px rgba(40, 119, 94, 0.18);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -52,12 +53,25 @@ html, body, #root {
   min-height: 100vh;
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 body {
   background: #f1f5f9;
 }
 
-button, input, textarea {
+button, input, textarea, select {
   font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid #28775e;
+  outline-offset: 2px;
 }
 
 .mobile-shell {
@@ -113,6 +127,33 @@ button, input, textarea {
   font-weight: 700;
 }
 
+.table-info {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.table-status {
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.table-status.occupied {
+  color: #166534;
+}
+
+.table-status.reserved {
+  color: #1d4ed8;
+}
+
+.table-status.maintenance {
+  color: #b91c1c;
+}
+
 .search-panel {
   padding: 14px 16px 10px;
   background: white;
@@ -128,6 +169,11 @@ button, input, textarea {
   padding: 12px 14px;
   background: #f8fafc;
   outline: none;
+}
+
+.search-panel input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
 }
 
 .category-bar {
@@ -398,6 +444,7 @@ button, input, textarea {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px 12px;
+  box-sizing: border-box;
 }
 
 .order-note-box {
@@ -427,6 +474,54 @@ button, input, textarea {
   border-radius: 12px;
   padding: 12px 18px;
   cursor: pointer;
+}
+
+.checkout-row button:disabled,
+.meta-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 480px) {
+  .mobile-shell {
+    padding: 0;
+  }
+
+  .phone-frame {
+    min-height: 100svh;
+    border-radius: 0;
+  }
+
+  .topbar {
+    padding-inline: 14px;
+  }
+
+  .product-card {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .product-image {
+    width: 72px;
+    height: 72px;
+  }
+
+  .title-row {
+    align-items: flex-start;
+  }
+
+  .title-row h3 {
+    overflow-wrap: anywhere;
+  }
+
+  .meta-row {
+    align-items: flex-end;
+  }
+
+  .meta-row button {
+    min-height: 40px;
+    padding-inline: 13px;
+  }
 }
 
 .empty-state, .empty-cart, .error-state p, .loading-state p {

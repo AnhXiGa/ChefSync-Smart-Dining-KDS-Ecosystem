@@ -143,6 +143,8 @@ public class OrderService : IOrderService
         _context.Orders.Add(order);
 
         table.Status = "Occupied";
+        table.OccupiedAt ??= DateTime.UtcNow;
+        table.VacatedAt = null;
         table.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -276,12 +278,14 @@ public class OrderService : IOrderService
             order.CompletedAt = DateTime.UtcNow;
 
             order.Table.Status = "Available";
+            order.Table.VacatedAt = DateTime.UtcNow;
             order.Table.UpdatedAt = DateTime.UtcNow;
         }
 
         if (status == "Cancelled")
         {
             order.Table.Status = "Available";
+            order.Table.VacatedAt = DateTime.UtcNow;
             order.Table.UpdatedAt = DateTime.UtcNow;
 
             foreach (var item in order.OrderItems)

@@ -553,6 +553,9 @@ namespace backend.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<DateTime?>("OccupiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("QrToken")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
@@ -569,6 +572,9 @@ namespace backend.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VacatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");

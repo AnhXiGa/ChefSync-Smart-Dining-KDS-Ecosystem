@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5266'}/api/customer`;
+const configuredApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5266').replace(/\/+$/, '');
+const apiUrl = typeof window !== 'undefined' &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1' &&
+  /:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i.test(configuredApiUrl)
+  ? configuredApiUrl.replace(/:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i, `://${window.location.hostname}:5266`)
+  : configuredApiUrl;
+const API_BASE_URL = `${apiUrl}/api/customer`;
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('vi-VN', {
@@ -201,7 +208,12 @@ function CustomerMobileMenu() {
             <h1>SMART RESTAURANT</h1>
             <p>Gọi món tại bàn qua QR</p>
           </div>
-          <div className="table-badge">📍 {tableInfo?.tableNumber}</div>
+          <div className="table-info">
+            <div className="table-badge">📍 {tableInfo?.tableNumber}</div>
+            <span className={`table-status ${String(tableInfo?.status || '').toLowerCase()}`}>
+              {tableStatusLabels[tableInfo?.status] || 'Chưa xác định'}
+            </span>
+          </div>
         </header>
 
         <div className="search-panel">
