@@ -1,0 +1,347 @@
+/* Shared layout safeguards */
+.app-shell,
+.main-shell,
+.page,
+.page-title,
+.workspace,
+.order-layout,
+.checkout-layout,
+.payment-layout,
+.manager-grid,
+.kitchen-board {
+  min-width: 0;
+}
+
+.page-title > :first-child,
+.data-row > span,
+.kitchen-item-details > strong,
+.checkout-item span,
+.payment-history-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.primary,
+.secondary,
+.tab,
+.topbar-logout,
+.table-primary-button,
+.table-secondary-button,
+.table-qr-button,
+.refresh-button,
+.row-action,
+.category-actions button,
+.checkout-actions button {
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+}
+
+.primary:hover:not(:disabled) {
+  background: #0e503b;
+  border-color: #0e503b;
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: #b8c9bd;
+  background: #f3f8f4;
+  color: #1d755c;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.checkout-detail-panel,
+.checkout-table-panel,
+.payment-history-table,
+.detail-card,
+.order-summary,
+.invoice-list,
+.invoice-detail,
+.payment-box,
+.data-card,
+.table-manager-card,
+.kitchen-column {
+  min-width: 0;
+}
+
+.table-operation-dialog,
+.payment-modal,
+.table-qr-dialog {
+  box-sizing: border-box;
+  max-height: calc(100svh - 36px);
+}
+
+.category-form input,
+.category-form button,
+.users-form input,
+.users-form select,
+.users-form button,
+.supplier-form input,
+.supplier-form button,
+.purchase-order-form input,
+.purchase-order-form select,
+.purchase-order-form button {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace,
+  .order-layout,
+  .payment-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .payment-box {
+    grid-column: auto;
+  }
+
+  .table-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .kitchen-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .app-shell {
+    display: block;
+  }
+
+  .app-shell .sidebar {
+    width: 100%;
+    min-height: auto;
+    padding: 12px 14px;
+    border-right: 0;
+    border-bottom: 1px solid #e4e9e4;
+  }
+
+  .app-shell .brand {
+    margin: 0 4px 12px;
+  }
+
+  .app-shell .restaurant-card,
+  .app-shell .sidebar-footer {
+    display: none;
+  }
+
+  .app-shell .sidebar nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .app-shell .nav-group {
+    display: contents;
+  }
+
+  .app-shell .nav-heading {
+    display: none;
+  }
+
+  .app-shell .nav-item {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .app-shell .topbar {
+    position: static;
+    height: auto;
+    min-height: 54px;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    padding: 10px 16px;
+  }
+
+  .app-shell .topbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .app-shell .topbar-right > span:first-child,
+  .app-shell .topbar-right .bell,
+  .app-shell .topbar-right .notice {
+    display: none;
+  }
+
+  .page {
+    padding: 22px 16px 34px;
+  }
+
+  .page-title {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .page-title > :last-child {
+    width: 100%;
+  }
+
+  .page-title > :last-child button {
+    width: 100%;
+  }
+
+  .table-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kitchen-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .module-toolbar .secondary,
+  .module-toolbar select {
+    flex: 1 1 150px;
+  }
+
+  .category-form,
+  .users-form,
+  .supplier-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .category-form {
+    align-items: stretch;
+  }
+
+  .category-form button,
+  .users-form button,
+  .supplier-form button {
+    width: 100%;
+  }
+
+  .checkout-actions,
+  .table-operation-actions,
+  .payment-methods {
+    flex-wrap: wrap;
+  }
+
+  .checkout-actions button,
+  .table-operation-actions button {
+    flex: 1 1 180px;
+  }
+
+  .checkout-payment-buttons {
+    width: 100%;
+  }
+
+  .checkout-payment-buttons button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .checkout-invoice-heading {
+    gap: 10px;
+  }
+
+  .checkout-invoice-status {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 21px;
+  }
+
+  .payment-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .payment-pagination > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 520px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .table-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-card {
+    height: auto;
+    min-height: 125px;
+  }
+
+  .detail-card,
+  .order-summary,
+  .invoice-list,
+  .invoice-detail,
+  .payment-box,
+  .checkout-table-panel,
+  .checkout-detail-panel {
+    padding: 16px;
+  }
+
+  .cash-denominations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .table-operation-overlay,
+  .payment-modal-overlay {
+    padding: 10px;
+  }
+
+  .table-operation-dialog,
+  .payment-modal {
+    padding: 18px;
+  }
+
+  .customer-header {
+    padding-inline: 14px;
+  }
+
+  .customer-header > span {
+    max-width: 48%;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .customer-content {
+    padding: 24px 14px 110px;
+  }
+
+  .customer-categories {
+    overflow-x: auto;
+    padding-bottom: 3px;
+    white-space: nowrap;
+  }
+
+  .customer-item {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .customer-item .food-image {
+    height: 78px;
+  }
+
+  .customer-cart {
+    width: calc(100% - 20px);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .customer-cart div {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .customer-cart .primary {
+    padding-inline: 10px;
+    white-space: nowrap;
+  }
+}

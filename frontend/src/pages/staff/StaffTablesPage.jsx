@@ -50,6 +50,7 @@ export function StaffTablesPage() {
         ),
       })).map((table) => ({
         ...table,
+        total: table.activeOrder?.totalAmount ?? 0,
         status: table.activeOrder && table.apiStatus !== "Maintenance"
           ? "occupied"
           : {

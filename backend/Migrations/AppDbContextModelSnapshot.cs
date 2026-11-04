@@ -383,7 +383,9 @@ namespace backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('Pending', 'Paid')");
 
                     b.HasIndex("TransactionCode")
                         .IsUnique();

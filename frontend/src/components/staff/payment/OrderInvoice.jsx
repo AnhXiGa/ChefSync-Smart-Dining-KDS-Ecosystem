@@ -1,9 +1,12 @@
+import { PaymentStatus } from "./PaymentStatus";
+
 const money = (value) => `${new Intl.NumberFormat("vi-VN").format(value || 0)} ₫`;
 
-export function OrderInvoice({ order }) {
+export function OrderInvoice({ order, paymentStatus, onCancelPayment, cancelBusy = false }) {
   if (!order) {
     return <div className="checkout-empty">Chọn bàn có order để xem hóa đơn.</div>;
   }
+  const items = Array.isArray(order.items) ? order.items : [];
 
   return (
     <div className="checkout-invoice">
@@ -17,9 +20,24 @@ export function OrderInvoice({ order }) {
             {order.completedAt && <> · Kết thúc: {new Date(order.completedAt).toLocaleString("vi-VN")}</>}
           </p>
         </div>
+        {(paymentStatus || onCancelPayment) && (
+          <div className="checkout-invoice-status">
+            {paymentStatus && <PaymentStatus status={paymentStatus} />}
+            {onCancelPayment && (
+              <button
+                className="checkout-cancel-payment"
+                type="button"
+                onClick={onCancelPayment}
+                disabled={cancelBusy}
+              >
+                {cancelBusy ? "Đang hủy…" : "Hủy hóa đơn"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="checkout-items">
-        {order.items.map((item) => (
+        {items.map((item) => (
           <div className="checkout-item" key={item.id}>
             <span>{item.productName}<small>{item.quantity} × {money(item.unitPrice)}</small></span>
             <strong>{money(item.subtotal)}</strong>

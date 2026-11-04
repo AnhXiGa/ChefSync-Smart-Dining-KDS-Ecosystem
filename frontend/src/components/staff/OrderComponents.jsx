@@ -25,6 +25,7 @@ export function OrderSummary({
   onPayment,
   saving = false,
   paymentDisabled = false,
+  paymentHint = "",
   existingOrder = null,
 }) {
   const displayItems = cart.length > 0
@@ -91,6 +92,7 @@ export function OrderSummary({
       >
         Thanh toán đơn hiện tại
       </button>
+      {paymentHint && <p className="checkout-payment-hint">{paymentHint}</p>}
     </aside>
   );
 }

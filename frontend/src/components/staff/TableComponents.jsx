@@ -41,7 +41,7 @@ export function TableCard({ table, selected, onClick, reservation = {} }) {
               ? `${table.capacity} chỗ ngồi`
               : `${table.capacity} chỗ ngồi`}
       </p>
-      <b>{table.total ? formatMoney(table.total) : "—"}</b>
+      <b>{table.total != null ? formatMoney(table.total) : "0 ₫"}</b>
     </button>
   );
 }
@@ -75,10 +75,6 @@ export function TableDetails({
             <div>
               <span>Vào bàn</span>
               <b>{formatDateTime(table.occupiedAt || table.activeOrder?.createdAt)}</b>
-            </div>
-            <div>
-              <span>Kết thúc</span>
-              <b>{formatDateTime(table.vacatedAt)}</b>
             </div>
           </>
         )}

@@ -8,7 +8,7 @@ export const navigationGroups = [
     items: [
       ['tables', '▦', 'Quản lý bàn', '/staff/tables'],
       ['checkout', '▣', 'Checkout', '/staff/checkout'],
-      ['payments', '▤', 'Lịch sử thanh toán', '/staff/payments'],
+      ['payments', '▤', 'Quản lý hóa đơn', '/staff/payments'],
       ['kds', '♨', 'Bếp KDS', '/kitchen'],
     ],
   },
