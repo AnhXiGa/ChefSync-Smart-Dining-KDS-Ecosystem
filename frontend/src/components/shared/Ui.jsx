@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { navigationGroups } from "../../data/navigationData";
+import { canAccessPath, getStoredUser } from "../../auth/roleAccess";
 
 export function StatusBadge({ children, kind = "green" }) {
   return <span className={`badge ${kind}`}>{children}</span>;
@@ -15,6 +16,20 @@ export function Icon({ children }) {
 
 export function Sidebar({ role = "staff" }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = getStoredUser();
+  const visibleGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(([, , , path]) => path && canAccessPath(path, user?.roles)),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const logout = () => {
+    localStorage.removeItem("smart-pos-user");
+    navigate("/login", { replace: true });
+  };
+
   return (
     <aside className="sidebar">
       <Link
@@ -35,7 +50,7 @@ export function Sidebar({ role = "staff" }) {
         <small>Chi nhánh Nguyễn Huệ</small>
       </div>
       <nav>
-        {navigationGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div className="nav-group" key={group.title}>
             <p className="nav-heading">{group.title}</p>
             {group.items.map(([id, icon, label, path]) =>
@@ -61,13 +76,13 @@ export function Sidebar({ role = "staff" }) {
       <div className="sidebar-footer">
         <span>Trợ giúp</span>
         <span>·</span>
-        <button>Đăng xuất</button>
+        <button type="button" onClick={logout}>Đăng xuất</button>
       </div>
     </aside>
   );
 }
 
-export function Topbar({ title = "Minh Anh · Quản lý" }) {
+export function Topbar({ title = "Minh Anh · Quản lý", onLogout }) {
   return (
     <header className="topbar">
       <div className="breadcrumb">
@@ -79,17 +94,25 @@ export function Topbar({ title = "Minh Anh · Quản lý" }) {
         <span className="notice">3 thông báo</span>
         <span className="avatar">MH</span>
         <strong>{title}</strong>
+        <button className="topbar-logout" type="button" onClick={onLogout}>Đăng xuất</button>
       </div>
     </header>
   );
 }
 
 export function BackofficeLayout({ children, role = "staff", title }) {
+  const navigate = useNavigate();
+  const user = getStoredUser();
+  const logout = () => {
+    localStorage.removeItem("smart-pos-user");
+    navigate("/login", { replace: true });
+  };
+
   return (
     <div className="app-shell">
       <Sidebar role={role} />
       <div className="main-shell">
-        <Topbar title={title} />
+        <Topbar title={user?.fullName ?? title} onLogout={logout} />
         {children}
       </div>
     </div>

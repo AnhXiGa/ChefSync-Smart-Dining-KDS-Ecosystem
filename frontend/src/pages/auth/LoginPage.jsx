@@ -1,21 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
+import { getLandingPath } from "../../auth/roleAccess";
 import restaurantImage from "../../assets/login-restaurant.png";
 import "../../App.css";
-
-const roleRoutes = {
-  staff: "/staff/tables",
-  manager: "/manager",
-  kitchen: "/kitchen",
-};
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
-  const [role, setRole] = useState("staff");
   const [error, setError] = useState("");
 
   const submit = async (event) => {
@@ -30,13 +24,14 @@ export function LoginPage() {
         password,
       });
       const user = response.data.user;
-      const roles = user.roles ?? [];
-      const destination = roles.includes("Manager")
-        ? "/manager"
-        : roleRoutes[role];
+      const destination = getLandingPath(user);
+      if (!destination) {
+        setError("Tài khoản chưa được gán vai trò hợp lệ. Vui lòng liên hệ quản trị viên.");
+        return;
+      }
       localStorage.setItem("smart-pos-user", JSON.stringify(user));
       if (remember) localStorage.setItem("smart-pos-email", email.trim());
-      navigate(destination);
+      navigate(destination, { replace: true });
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? "Không thể đăng nhập.");
     }
@@ -111,17 +106,6 @@ export function LoginPage() {
                 Quên mật khẩu?
               </button>
             </div>
-            <label className="role-select">
-              Vai trò đăng nhập
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value)}
-              >
-                <option value="staff">Nhân viên phục vụ</option>
-                <option value="manager">Quản lý nhà hàng</option>
-                <option value="kitchen">Điều phối bếp</option>
-              </select>
-            </label>
             {error && (
               <p className="login-error" role="alert">
                 {error}
