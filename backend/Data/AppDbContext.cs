@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<RestaurantTable> RestaurantTables => Set<RestaurantTable>();
@@ -119,6 +120,30 @@ public class AppDbContext : DbContext
 
             entity.HasOne(x => x.Role)
                 .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("RolePermissions");
+
+            entity.HasKey(x => new
+            {
+                x.RoleId,
+                x.PermissionKey
+            });
+
+            entity.Property(x => x.PermissionKey)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.AccessLevel)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.Permissions)
                 .HasForeignKey(x => x.RoleId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

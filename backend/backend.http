@@ -73,5 +73,6 @@ DELETE {{backend_HostAddress}}/api/notifications/1?userId=1
 
 # SignalR hub: {{backend_HostAddress}}/hubs/orders
 # Invoke JoinOrder(orderId) to subscribe to OrderItemStatusChanged events.
+# Kitchen displays invoke JoinKitchen() to receive status updates for all active orders.
 # SignalR hub: {{backend_HostAddress}}/hubs/notifications
 # Invoke JoinUserNotifications(userId) to subscribe to NotificationsChanged events.

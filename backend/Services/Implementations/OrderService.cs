@@ -1,7 +1,9 @@
 using backend.Data;
 using backend.DTOs.Orders;
+using backend.Hubs;
 using backend.Models;
 using backend.Services.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 
@@ -11,13 +13,16 @@ public class OrderService : IOrderService
 {
     private readonly AppDbContext _context;
     private readonly IInventoryService _inventoryService;
+    private readonly IHubContext<OrderHub> _orderHub;
 
     public OrderService(
         AppDbContext context,
-        IInventoryService inventoryService)
+        IInventoryService inventoryService,
+        IHubContext<OrderHub> orderHub)
     {
         _context = context;
         _inventoryService = inventoryService;
+        _orderHub = orderHub;
     }
 
     // =========================================================
@@ -142,9 +147,15 @@ public class OrderService : IOrderService
 
         await _context.SaveChangesAsync();
 
-        return await GetByIdAsync(order.Id)
+        var createdOrder = await GetByIdAsync(order.Id)
             ?? throw new Exception(
                 "Không thể lấy đơn hàng vừa tạo.");
+
+        await _orderHub.Clients
+            .Group(OrderHub.KitchenGroupName)
+            .SendAsync("KdsOrdersChanged");
+
+        return createdOrder;
     }
 
     // =========================================================

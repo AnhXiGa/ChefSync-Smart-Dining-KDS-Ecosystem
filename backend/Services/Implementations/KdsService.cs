@@ -134,12 +134,19 @@ public sealed class KdsService(
         }
 
         var response = MapOrderItem(item, item.Order);
-        await orderHub.Clients
-            .Group(OrderHub.GetOrderGroup(item.OrderId))
-            .SendAsync(
-                "OrderItemStatusChanged",
-                response,
-                cancellationToken);
+        await Task.WhenAll(
+            orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(item.OrderId))
+                .SendAsync(
+                    "OrderItemStatusChanged",
+                    response,
+                    cancellationToken),
+            orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync(
+                    "OrderItemStatusChanged",
+                    response,
+                    cancellationToken));
 
         return response;
     }

@@ -29,10 +29,11 @@ export const adminModules = {
   },
   'stock-in': {
     title: 'Nhập kho',
-    description: 'Quản lý phiếu nhập, nhà cung cấp và lịch sử nhận hàng.',
-    action: '＋ Tạo phiếu nhập',
-    columns: ['Mã phiếu', 'Nhà cung cấp', 'Ngày nhập', 'Tổng tiền', 'Trạng thái'],
-    rows: [['PN-1410-012', 'Thực phẩm Minh Phát', '18/10/2026', formatMoney(4250000), 'Đã nhập'], ['PN-1410-011', 'Nông sản An Nhiên', '17/10/2026', formatMoney(2180000), 'Đã nhập'], ['PN-1410-010', 'Đồ uống Việt', '16/10/2026', formatMoney(960000), 'Chờ duyệt']],
+    description: 'Theo dõi các phiếu đã nhận và số lượng nguyên liệu đã cộng vào kho.',
+  },
+  'purchase-orders': {
+    title: 'Phiếu nhập hàng',
+    description: 'Tạo phiếu nhập hàng, theo dõi trạng thái và xác nhận hàng đã nhận.',
   },
   'stock-out': {
     title: 'Xuất kho & biến động',
@@ -57,9 +58,6 @@ export const adminModules = {
   },
   users: {
     title: 'Người dùng & quyền',
-    description: 'Quản lý tài khoản nhân viên, vai trò và quyền truy cập.',
-    action: '＋ Mời người dùng',
-    columns: ['Nhân viên', 'Email', 'Vai trò', 'Ca làm việc', 'Trạng thái'],
-    rows: [['Minh Anh', 'minhanh@annhien.vn', 'Quản lý', 'Ca trưa', 'Đang hoạt động'], ['Thu Hà', 'thuha@annhien.vn', 'Nhân viên', 'Ca trưa', 'Đang hoạt động'], ['Thanh Tâm', 'thanhtam@annhien.vn', 'Thu ngân', 'Ca trưa', 'Đang hoạt động'], ['Bếp trưởng', 'bep@annhien.vn', 'Điều phối bếp', 'Ca trưa', 'Đang hoạt động']],
+    description: 'Quản lý tài khoản và chọn một trong năm vai trò có sẵn.',
   },
 }

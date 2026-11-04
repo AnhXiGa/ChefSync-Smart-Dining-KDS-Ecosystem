@@ -7,8 +7,7 @@ import {
 import { adminModules } from "../../data/adminData";
 import axiosClient from "../../api/axiosClient";
 
-const inventoryModules = new Set(["inventory", "bom", "stock-in", "stock-out"]);
-
+const inventoryModules = new Set(["inventory", "bom", "stock-out"]);
 function getError(error, fallback) {
   return error.response?.data?.message ?? fallback;
 }
@@ -185,9 +184,9 @@ function InventoryModule({ module, config }) {
     );
   }
 
-  if (module === "stock-in" || module === "stock-out") {
+  if (module === "stock-out") {
     const rows = transactions.filter((item) =>
-      module === "stock-in" ? item.type === "Receipt" : item.type !== "Receipt",
+      item.type !== "Receipt",
     );
     return (
       <>
@@ -242,17 +241,486 @@ function InventoryModule({ module, config }) {
   );
 }
 
+function ReceivedStockModule({ config }) {
+  const [orders, setOrders] = useState([]);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const response = await axiosClient.get("/api/purchase-orders");
+      setOrders(response.data.filter((order) => order.status === "Received"));
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải phiếu nhập kho."));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load completed receipts when the stock-in page opens.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} />
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <section className="data-card">
+        <div className="data-card-head">
+          <div><strong>{orders.length} phiếu đã nhập kho</strong><p>Chỉ hiển thị phiếu đã chuyển sang trạng thái Received</p></div>
+          <button className="secondary" type="button" onClick={load}>Làm mới</button>
+        </div>
+        <div className="data-table purchase-order-table">
+          <div className="data-row data-header"><span>Mã phiếu / Nhà cung cấp</span><span>Nguyên liệu đã nhập</span><span>Ngày nhận</span><span>Tổng tiền</span><span>Trạng thái</span><span /></div>
+          {orders.map((order) => (
+            <div className="data-row" key={order.id}>
+              <span><strong>{order.purchaseCode}</strong><small>{order.supplierName}</small></span>
+              <span>{order.items.map((item) => `${item.ingredientName}: ${item.quantity} ${item.unit}`).join(", ")}</span>
+              <span>{order.receivedAt ? new Date(order.receivedAt).toLocaleString("vi-VN") : "—"}</span>
+              <span>{Number(order.totalAmount).toLocaleString("vi-VN")} ₫</span>
+              <span><StatusBadge kind="green">Đã nhập kho</StatusBadge></span>
+              <span />
+            </div>
+          ))}
+          {orders.length === 0 && <div className="users-empty">Chưa có phiếu nhập kho đã nhận.</div>}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function SuppliersModule({ config }) {
+  const [suppliers, setSuppliers] = useState([]);
+  const [form, setForm] = useState({ name: "", phone: "", email: "", address: "" });
+  const [editingId, setEditingId] = useState(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const response = await axiosClient.get("/api/suppliers");
+      setSuppliers(response.data);
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải danh sách nhà cung cấp."));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load suppliers when this module opens.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      if (editingId) {
+        await axiosClient.put(`/api/suppliers/${editingId}`, form);
+      } else {
+        await axiosClient.post("/api/suppliers", form);
+      }
+      setForm({ name: "", phone: "", email: "", address: "" });
+      setEditingId(null);
+      await load();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể lưu nhà cung cấp."));
+    }
+  };
+
+  const edit = (supplier) => {
+    setEditingId(supplier.id);
+    setForm({
+      name: supplier.name,
+      phone: supplier.phone ?? "",
+      email: supplier.email ?? "",
+      address: supplier.address ?? "",
+    });
+  };
+
+  const toggleStatus = async (supplier) => {
+    try {
+      await axiosClient.patch(`/api/suppliers/${supplier.id}/status`, {
+        isActive: !supplier.isActive,
+      });
+      await load();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể cập nhật nhà cung cấp."));
+    }
+  };
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} />
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <section className="data-card">
+        <div className="data-card-head"><div><strong>{suppliers.length} nhà cung cấp</strong><p>Danh bạ được lưu trong database</p></div><button className="secondary" type="button" onClick={load}>Làm mới</button></div>
+        <div className="data-table supplier-table">
+          <div className="data-row data-header"><span>Nhà cung cấp</span><span>Liên hệ</span><span>Địa chỉ</span><span>Số phiếu</span><span>Trạng thái</span><span /></div>
+          {suppliers.map((supplier) => (
+            <div className="data-row" key={supplier.id}>
+              <span><strong>{supplier.name}</strong></span>
+              <span>{supplier.phone || "—"}<small>{supplier.email || ""}</small></span>
+              <span>{supplier.address || "—"}</span>
+              <span>{supplier.purchaseOrderCount}</span>
+              <span><StatusBadge kind={supplier.isActive ? "green" : "orange"}>{supplier.isActive ? "Hoạt động" : "Ngừng hợp tác"}</StatusBadge></span>
+              <span className="supplier-actions">
+                <button className="secondary" type="button" onClick={() => edit(supplier)}>Sửa</button>
+                <button className="secondary" type="button" onClick={() => toggleStatus(supplier)}>{supplier.isActive ? "Ngừng" : "Mở lại"}</button>
+              </span>
+            </div>
+          ))}
+          {suppliers.length === 0 && <div className="users-empty">Chưa có nhà cung cấp.</div>}
+        </div>
+      </section>
+      <section className="data-card users-form-card">
+        <div className="data-card-head"><div><strong>{editingId ? "Cập nhật nhà cung cấp" : "Thêm nhà cung cấp"}</strong><p>Thông tin liên hệ và địa chỉ</p></div></div>
+        <form className="supplier-form" onSubmit={submit}>
+          <input required maxLength={150} placeholder="Tên nhà cung cấp" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+          <input maxLength={20} placeholder="Số điện thoại" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+          <input type="email" maxLength={150} placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+          <input maxLength={300} placeholder="Địa chỉ" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} />
+          <button className="primary" type="submit">{editingId ? "Lưu thay đổi" : "Thêm nhà cung cấp"}</button>
+          {editingId && <button className="secondary" type="button" onClick={() => { setEditingId(null); setForm({ name: "", phone: "", email: "", address: "" }); }}>Hủy sửa</button>}
+        </form>
+      </section>
+    </>
+  );
+}
+
+function PurchaseOrdersModule({ config }) {
+  const [orders, setOrders] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
+  const [error, setError] = useState("");
+  const [updatingOrderIds, setUpdatingOrderIds] = useState([]);
+  const [items, setItems] = useState([{ ingredientId: "", quantity: "", unitPrice: "" }]);
+  const [form, setForm] = useState({ supplierId: "", note: "" });
+
+  const load = useCallback(async () => {
+    try {
+      const [orderResponse, supplierResponse, ingredientResponse] = await Promise.all([
+        axiosClient.get("/api/purchase-orders"),
+        axiosClient.get("/api/suppliers"),
+        axiosClient.get("/api/ingredients"),
+      ]);
+      setOrders(orderResponse.data);
+      setSuppliers(supplierResponse.data);
+      setIngredients(ingredientResponse.data);
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải phiếu nhập hàng."));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load purchase orders and their supplier and ingredient options.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
+
+  const updateItem = (index, key, value) => {
+    setItems((current) => current.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, [key]: value } : item,
+    ));
+  };
+
+  const createOrder = async (event) => {
+    event.preventDefault();
+    let user;
+    try {
+      user = JSON.parse(localStorage.getItem("smart-pos-user") ?? "null");
+    } catch {
+      setError("Không đọc được thông tin tài khoản đăng nhập.");
+      return;
+    }
+    if (!user?.id) {
+      setError("Vui lòng đăng nhập lại trước khi tạo phiếu nhập.");
+      return;
+    }
+
+    try {
+      await axiosClient.post("/api/purchase-orders", {
+        supplierId: Number(form.supplierId),
+        createdByUserId: Number(user.id),
+        note: form.note,
+        items: items.map((item) => ({
+          ingredientId: Number(item.ingredientId),
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+        })),
+      });
+      setForm({ supplierId: "", note: "" });
+      setItems([{ ingredientId: "", quantity: "", unitPrice: "" }]);
+      await load();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tạo phiếu nhập hàng."));
+    }
+  };
+
+  const receiveOrder = async (order) => {
+    setUpdatingOrderIds((current) => [...current, order.id]);
+    try {
+      const response = await axiosClient.patch(`/api/purchase-orders/${order.id}/receive`);
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                status: response.data.order.status,
+                receivedAt: response.data.order.receivedAt,
+              }
+            : item,
+        ),
+      );
+      setError("");
+    } catch (requestError) {
+      try {
+        const response = await axiosClient.get(`/api/purchase-orders/${order.id}`);
+        if (response.data.status === "Received") {
+          setOrders((current) =>
+            current.map((item) => item.id === order.id ? response.data : item),
+          );
+          setError("");
+        } else {
+          setError(getError(requestError, "Không thể nhận phiếu nhập hàng."));
+        }
+      } catch {
+        setError(getError(requestError, "Không thể nhận phiếu nhập hàng."));
+      }
+    } finally {
+      setUpdatingOrderIds((current) => current.filter((id) => id !== order.id));
+    }
+  };
+
+  const cancelOrder = async (order) => {
+    setUpdatingOrderIds((current) => [...current, order.id]);
+    try {
+      await axiosClient.patch(`/api/purchase-orders/${order.id}/cancel`);
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id ? { ...item, status: "Cancelled" } : item,
+        ),
+      );
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể hủy phiếu nhập hàng."));
+    } finally {
+      setUpdatingOrderIds((current) => current.filter((id) => id !== order.id));
+    }
+  };
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} />
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <section className="data-card">
+        <div className="data-card-head"><div><strong>{orders.length} phiếu nhập</strong><p>Kho chỉ được cộng khi xác nhận nhận hàng</p></div><button className="secondary" type="button" onClick={load}>Làm mới</button></div>
+        <div className="data-table purchase-order-table">
+          <div className="data-row data-header"><span>Mã phiếu / Nhà cung cấp</span><span>Nguyên liệu</span><span>Ngày tạo</span><span>Tổng tiền</span><span>Trạng thái</span><span>Thao tác</span></div>
+          {orders.map((order) => (
+            <div className="data-row" key={order.id}>
+              <span><strong>{order.purchaseCode}</strong><small>{order.supplierName}</small></span>
+              <span>{order.items.map((item) => `${item.ingredientName}: ${item.quantity} ${item.unit}`).join(", ")}</span>
+              <span>{new Date(order.createdAt).toLocaleDateString("vi-VN")}</span>
+              <span>{Number(order.totalAmount).toLocaleString("vi-VN")} ₫</span>
+              <span><StatusBadge kind={order.status === "Received" ? "green" : order.status === "Cancelled" ? "orange" : "blue"}>{order.status === "Received" ? "Đã nhận" : order.status === "Cancelled" ? "Đã hủy" : order.status}</StatusBadge></span>
+              <span className="supplier-actions">
+                {order.status !== "Received" && order.status !== "Cancelled" && <button className="primary" type="button" disabled={updatingOrderIds.includes(order.id)} onClick={() => receiveOrder(order)}>{updatingOrderIds.includes(order.id) ? "Đang cập nhật..." : "Nhận hàng"}</button>}
+                {order.status !== "Received" && order.status !== "Cancelled" && <button className="secondary" type="button" disabled={updatingOrderIds.includes(order.id)} onClick={() => cancelOrder(order)}>Hủy</button>}
+              </span>
+            </div>
+          ))}
+          {orders.length === 0 && <div className="users-empty">Chưa có phiếu nhập hàng.</div>}
+        </div>
+      </section>
+      <section className="data-card users-form-card">
+        <div className="data-card-head"><div><strong>Tạo phiếu nhập hàng</strong><p>Xác nhận “Nhận hàng” sẽ cộng số lượng vào kho một lần</p></div></div>
+        <form className="purchase-order-form" onSubmit={createOrder}>
+          <select required value={form.supplierId} onChange={(event) => setForm({ ...form, supplierId: event.target.value })}>
+            <option value="">Chọn nhà cung cấp</option>
+            {suppliers.filter((supplier) => supplier.isActive).map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name}</option>)}
+          </select>
+          <input placeholder="Ghi chú" maxLength={500} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+          {items.map((item, index) => (
+            <div className="purchase-order-item" key={index}>
+              <select required value={item.ingredientId} onChange={(event) => updateItem(index, "ingredientId", event.target.value)}>
+                <option value="">Chọn nguyên liệu</option>
+                {ingredients.filter((ingredient) => ingredient.isActive).map((ingredient) => <option value={ingredient.id} key={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}
+              </select>
+              <input required type="number" min="0.001" step="0.001" placeholder="Số lượng" value={item.quantity} onChange={(event) => updateItem(index, "quantity", event.target.value)} />
+              <input required type="number" min="0" step="0.01" placeholder="Đơn giá" value={item.unitPrice} onChange={(event) => updateItem(index, "unitPrice", event.target.value)} />
+              {items.length > 1 && <button className="secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Xóa dòng</button>}
+            </div>
+          ))}
+          <div className="purchase-order-actions">
+            <button className="secondary" type="button" onClick={() => setItems((current) => [...current, { ingredientId: "", quantity: "", unitPrice: "" }])}>＋ Thêm nguyên liệu</button>
+            <button className="primary" type="submit" disabled={!suppliers.some((supplier) => supplier.isActive) || ingredients.length === 0}>Tạo phiếu nhập</button>
+          </div>
+        </form>
+      </section>
+    </>
+  );
+}
+
+function UsersModule({ config }) {
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
+  const [userForm, setUserForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    position: "",
+    roleId: "",
+  });
+
+  const load = useCallback(async () => {
+    try {
+      const [usersResponse, rolesResponse] = await Promise.all([
+        axiosClient.get("/api/users"),
+        axiosClient.get("/api/roles"),
+      ]);
+      setUsers(usersResponse.data);
+      setRoles(rolesResponse.data);
+      setError("");
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tải tài khoản và vai trò."));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load persisted accounts and roles when the module opens.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void load();
+  }, [load]);
+
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((user) =>
+        `${user.fullName} ${user.email} ${user.employeeCode} ${(user.roles ?? []).join(" ")}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      ),
+    [users, query],
+  );
+
+  const createUser = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await axiosClient.post("/api/users", {
+        ...userForm,
+        roleIds: userForm.roleId ? [Number(userForm.roleId)] : [],
+      });
+      setUsers((currentUsers) => [
+        response.data,
+        ...currentUsers.filter((user) => user.id !== response.data.id),
+      ]);
+      setError("");
+      setUserForm({
+        fullName: "",
+        email: "",
+        password: "",
+        position: "",
+        roleId: "",
+      });
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể tạo tài khoản."));
+    }
+  };
+
+  const updateUserRole = async (userId, roleId) => {
+    if (!roleId) return;
+    try {
+      await axiosClient.put(`/api/users/${userId}/roles`, {
+        roleIds: [Number(roleId)],
+      });
+      const selectedRole = roles.find((role) => role.id === Number(roleId));
+      setUsers((currentUsers) =>
+        currentUsers.map((user) =>
+          user.id === userId
+            ? {
+                ...user,
+                roleIds: [Number(roleId)],
+                roles: selectedRole ? [selectedRole.name] : user.roles,
+              }
+            : user,
+        ),
+      );
+      await load();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể cập nhật vai trò tài khoản."));
+    }
+  };
+
+  const toggleUserStatus = async (user) => {
+    try {
+      await axiosClient.patch(`/api/users/${user.id}/status`, {
+        isActive: !user.isActive,
+      });
+      await load();
+    } catch (requestError) {
+      setError(getError(requestError, "Không thể cập nhật trạng thái tài khoản."));
+    }
+  };
+
+  return (
+    <>
+      <PageTitle title={config.title} description={config.description} />
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <div className="module-toolbar">
+        <div className="search">⌕ <input placeholder="Tìm tài khoản..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <button className="secondary" type="button" onClick={load}>Làm mới</button>
+      </div>
+      <section className="data-card">
+        <div className="data-card-head"><div><strong>{filteredUsers.length} tài khoản</strong><p>Danh sách nhân viên từ database</p></div><StatusBadge>Đang đồng bộ</StatusBadge></div>
+        <div className="data-table users-table">
+          <div className="data-row data-header"><span>Nhân viên</span><span>Email</span><span>Vai trò</span><span>Chức vụ</span><span>Trạng thái</span><span /></div>
+          {filteredUsers.map((user) => (
+            <div className="data-row" key={user.id}>
+              <span><strong>{user.fullName}</strong><small>{user.employeeCode}</small></span>
+              <span>{user.email}</span>
+              <span><select value={user.roleIds?.[0]?.toString() ?? ""} onChange={(event) => updateUserRole(user.id, event.target.value)} aria-label={`Vai trò của ${user.fullName}`}>
+                <option value="" disabled>Chọn vai trò</option>
+                {roles.map((role) => <option value={role.id} key={role.id}>{role.name}</option>)}
+              </select></span>
+              <span>{user.position || "—"}</span>
+              <span><StatusBadge kind={user.isActive ? "green" : "orange"}>{user.isActive ? "Hoạt động" : "Đã khóa"}</StatusBadge></span>
+              <button className="secondary user-status-action" type="button" onClick={() => toggleUserStatus(user)}>{user.isActive ? "Khóa" : "Mở"}</button>
+            </div>
+          ))}
+          {filteredUsers.length === 0 && <div className="users-empty">Không tìm thấy tài khoản nào.</div>}
+        </div>
+      </section>
+      <section className="data-card users-form-card">
+        <div className="data-card-head"><div><strong>Tạo tài khoản</strong><p>Mật khẩu được mã hóa trước khi lưu vào database</p></div></div>
+        <form className="users-form" onSubmit={createUser}>
+          <input required placeholder="Họ và tên" value={userForm.fullName} onChange={(event) => setUserForm({ ...userForm, fullName: event.target.value })} />
+          <input required type="email" placeholder="Email" value={userForm.email} onChange={(event) => setUserForm({ ...userForm, email: event.target.value })} />
+          <input required type="password" minLength={8} placeholder="Mật khẩu (ít nhất 8 ký tự)" value={userForm.password} onChange={(event) => setUserForm({ ...userForm, password: event.target.value })} />
+          <input placeholder="Chức vụ" value={userForm.position} onChange={(event) => setUserForm({ ...userForm, position: event.target.value })} />
+          <select required value={userForm.roleId} onChange={(event) => setUserForm({ ...userForm, roleId: event.target.value })} aria-label="Chọn vai trò">
+            <option value="" disabled>Chọn vai trò</option>
+            {roles.map((role) => <option value={role.id} key={role.id}>{role.name}</option>)}
+          </select>
+          <button className="primary" type="submit">Tạo tài khoản</button>
+        </form>
+      </section>
+    </>
+  );
+}
+
 export function AdminModulePage({ module }) {
   const config = adminModules[module] || adminModules.menu;
   const [query, setQuery] = useState("");
-  const rows = config.rows.filter((row) =>
+  const rows = (config.rows ?? []).filter((row) =>
     row.join(" ").toLowerCase().includes(query.toLowerCase()),
   );
 
   return (
     <BackofficeLayout role="manager" title="Minh Anh · Quản lý">
       <main className="page admin-module-page">
-        {inventoryModules.has(module) ? <InventoryModule module={module} config={config} /> : (
+        {module === "users" ? <UsersModule config={config} /> : module === "suppliers" ? <SuppliersModule config={config} /> : module === "stock-in" ? <ReceivedStockModule config={config} /> : module === "purchase-orders" ? <PurchaseOrdersModule config={config} /> : inventoryModules.has(module) ? <InventoryModule module={module} config={config} /> : (
           <>
             <PageTitle title={config.title} description={config.description} action={<button className="primary">{config.action}</button>} />
             <div className="module-toolbar"><div className="search">⌕ <input placeholder="Tìm kiếm..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><button className="secondary">Bộ lọc</button><button className="secondary">Xuất báo cáo</button></div>
