@@ -28,6 +28,13 @@ const orderItemStatusLabels = {
   Cancelled: 'Đã hủy',
 };
 
+const tableStatusLabels = {
+  Available: 'Bàn trống',
+  Occupied: 'Đang phục vụ',
+  Reserved: 'Đã đặt trước',
+  Maintenance: 'Đang bảo trì',
+};
+
 function CustomerMobileMenu() {
   const [searchParams] = useSearchParams();
   const qrToken = searchParams.get('token') || '';
