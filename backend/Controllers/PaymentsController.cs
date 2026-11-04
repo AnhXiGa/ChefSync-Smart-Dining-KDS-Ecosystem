@@ -14,7 +14,8 @@ namespace backend.Controllers;
 [Route("api/payment")]
 public sealed class PaymentsController(
     IPaymentService paymentService,
-    IOptions<PaymentOptions> paymentOptions) : ApiScaffoldController
+    IOptions<PaymentOptions> paymentOptions,
+    ILogger<PaymentsController> logger) : ApiScaffoldController
 {
     [HttpPost]
     public async Task<IActionResult> CreatePayment(
@@ -94,8 +95,15 @@ public sealed class PaymentsController(
 
         try
         {
-            var result = await paymentService.ProcessSePayWebhookAsync(request);
-            return Ok(new { success = result });
+            var processed = await paymentService.ProcessSePayWebhookAsync(request);
+            if (!processed)
+            {
+                logger.LogWarning(
+                    "SePay webhook {WebhookId} was acknowledged but did not match a pending payment.",
+                    request.Id);
+            }
+
+            return Ok(new { success = true });
         }
         catch
         {
