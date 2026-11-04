@@ -171,6 +171,7 @@ export function StaffTablesPage() {
                   table={table}
                   selected={selectedTable === table.id}
                   onClick={() => setSelectedTable(table.id)}
+                  reservation={reservationDetails[table.id] || {}}
                   key={table.id}
                 />
               ))}
