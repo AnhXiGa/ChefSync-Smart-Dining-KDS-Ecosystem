@@ -1,5 +1,9 @@
 export const navigationGroups = [
   {
+    title: 'QUẢN LÝ NHÀ HÀNG',
+    items: [['manager-tables', '▦', 'Quản lý bàn & QR', '/manager/tables']],
+  },
+  {
     title: 'VẬN HÀNH',
     items: [
       ['tables', '▦', 'Quản lý bàn', '/staff/tables'],

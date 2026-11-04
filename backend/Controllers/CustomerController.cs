@@ -51,10 +51,6 @@ public sealed class CustomerController : ControllerBase
         if (table == null)
             return NotFound();
 
-        table.QrToken = Guid.NewGuid();
-        table.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
         return Ok(new
         {
             table.Id,
@@ -119,6 +115,9 @@ public sealed class CustomerController : ControllerBase
 
         if (table == null)
             return BadRequest(new { message = "Không xác định được bàn đặt món." });
+
+        if (table.Status == "Maintenance")
+            return BadRequest(new { message = "Bàn này đang bảo trì, vui lòng liên hệ nhân viên." });
 
         var productIds = request.Items
             .Select(i => i.ProductId)

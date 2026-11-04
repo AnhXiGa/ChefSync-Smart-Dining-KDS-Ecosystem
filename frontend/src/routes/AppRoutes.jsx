@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { CustomerOrderPage } from '../pages/customer/CustomerOrderPage'
+import CustomerMobileMenu from '../pages/CustomerMobileMenu'
 import { KitchenDashboardPage } from '../pages/kitchen/KitchenDashboardPage'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { AdminModulePage } from '../pages/manager/AdminModulePage'
@@ -7,6 +8,7 @@ import { ManagerDashboardPage } from '../pages/manager/ManagerDashboardPage'
 import { StaffOrderPage } from '../pages/staff/StaffOrderPage'
 import { StaffPaymentsPage } from '../pages/staff/StaffPaymentsPage'
 import { StaffTablesPage } from '../pages/staff/StaffTablesPage'
+import { ManagerTablesPage } from '../pages/manager/ManagerTablesPage'
 
 export function AppRoutes() {
   return <Routes>
@@ -20,6 +22,7 @@ export function AppRoutes() {
     <Route path="/manager/suppliers" element={<AdminModulePage module="suppliers" />} />
     <Route path="/manager/expenses" element={<AdminModulePage module="expenses" />} />
     <Route path="/manager/users" element={<AdminModulePage module="users" />} />
+    <Route path="/manager/tables" element={<ManagerTablesPage />} />
     <Route path="/manager/inventory" element={<AdminModulePage module="inventory" />} />
     <Route path="/manager/bom" element={<AdminModulePage module="bom" />} />
 
@@ -28,6 +31,7 @@ export function AppRoutes() {
     <Route path="/staff/payments" element={<StaffPaymentsPage />} />
 
     <Route path="/kitchen" element={<KitchenDashboardPage />} />
+    <Route path="/customer" element={<CustomerMobileMenu />} />
     <Route path="/customer/:tableId" element={<CustomerOrderPage />} />
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes>
