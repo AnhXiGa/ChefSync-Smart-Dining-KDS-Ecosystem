@@ -115,14 +115,22 @@ function CustomerMobileMenu() {
   }, [categories, searchQuery, selectedCategoryId]);
 
   const addToCart = (product) => {
+    const availableQuantity = product.availableQuantity;
     setCart((previous) => {
       const existingItem = previous.find((item) => item.product.id === product.id);
       if (existingItem) {
+        if (availableQuantity !== null && availableQuantity !== undefined &&
+          existingItem.quantity >= availableQuantity) {
+          return previous;
+        }
         return previous.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
         );
       }
-
+      if (availableQuantity !== null && availableQuantity !== undefined &&
+        availableQuantity <= 0) {
+        return previous;
+      }
       return [...previous, { product, quantity: 1, note: '' }];
     });
   };
@@ -130,9 +138,14 @@ function CustomerMobileMenu() {
   const updateQuantity = (productId, delta) => {
     setCart((previous) =>
       previous
-        .map((item) =>
-          item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item,
-        )
+        .map((item) => {
+          if (item.product.id !== productId) return item;
+          const maxQuantity = item.product.availableQuantity;
+          const nextQuantity = maxQuantity !== null && maxQuantity !== undefined
+            ? Math.min(item.quantity + delta, maxQuantity)
+            : item.quantity + delta;
+          return { ...item, quantity: nextQuantity };
+        })
         .filter((item) => item.quantity > 0),
     );
   };
@@ -192,6 +205,9 @@ function CustomerMobileMenu() {
       setOrderNote('');
       setIsCartOpen(false);
       await loadCustomerOrders().catch(() => {});
+      await axios.get(`${API_BASE_URL}/menu`)
+        .then((menuResponse) => setCategories(menuResponse.data || []))
+        .catch(() => {});
       setIsSubmittedPage(true);
     } catch (err) {
       alert(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đơn gọi món.');
@@ -613,8 +629,18 @@ function CustomerMobileMenu() {
 
                       <div className="meta-row">
                         {product.preparationTime ? <span>⏱ {product.preparationTime} phút</span> : <span>⏱ 15 phút</span>}
-                        <button type="button" onClick={() => addToCart(product)}>
-                          + Thêm
+                        <button
+                          type="button"
+                          onClick={() => addToCart(product)}
+                          disabled={product.availableQuantity !== null &&
+                            product.availableQuantity !== undefined &&
+                            product.availableQuantity <= 0}
+                        >
+                          {product.availableQuantity !== null &&
+                          product.availableQuantity !== undefined &&
+                          product.availableQuantity <= 0
+                            ? 'Hết nguyên liệu'
+                            : '+ Thêm'}
                         </button>
                       </div>
                     </div>
@@ -747,7 +773,15 @@ function CustomerMobileMenu() {
                             <div className="stepper">
                               <button type="button" onClick={() => updateQuantity(item.product.id, -1)}>−</button>
                               <span>{item.quantity}</span>
-                              <button type="button" onClick={() => updateQuantity(item.product.id, 1)}>+</button>
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.product.id, 1)}
+                                disabled={item.product.availableQuantity !== null &&
+                                  item.product.availableQuantity !== undefined &&
+                                  item.quantity >= item.product.availableQuantity}
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
                           <strong className="cart-line-total">

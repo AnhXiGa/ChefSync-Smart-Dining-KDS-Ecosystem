@@ -26,17 +26,23 @@ export function getLandingPath(user) {
 export function canAccessPath(path, roles = []) {
   if (roles.some((role) => adminRoles.includes(role))) return true;
 
-  if (path === "/staff/tables" || path === "/staff/checkout" || path.startsWith("/staff/order/") || path === "/staff/payments") {
+  if (
+    path === "/staff/tables" ||
+    path === "/staff/checkout" ||
+    path.startsWith("/staff/order/") ||
+    path === "/staff/payments"
+  ) {
     return roles.includes("Waiter");
   }
   if (path === "/kitchen") return roles.includes("Chef");
   if (
-    path === "/manager/inventory"
-    || path === "/manager/bom"
-    || path === "/manager/stock-in"
-    || path === "/manager/purchase-orders"
-    || path === "/manager/stock-out"
-    || path === "/manager/suppliers"
+    path === "/manager/inventory" ||
+    path === "/manager/bom" ||
+    path === "/manager/stock-in" ||
+    path === "/manager/stock-movements" ||
+    path === "/manager/purchase-orders" ||
+    path === "/manager/stock-out" ||
+    path === "/manager/suppliers"
   ) {
     return roles.includes("Inventory");
   }

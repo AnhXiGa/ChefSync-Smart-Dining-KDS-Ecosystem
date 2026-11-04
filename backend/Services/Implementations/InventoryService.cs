@@ -194,36 +194,32 @@ public sealed class InventoryService(AppDbContext context) : IInventoryService
         return true;
     }
 
-    public async Task DeductForOrderAsync(
+    public async Task DeductForOrderItemAsync(
         int orderId,
-        IReadOnlyList<(int ProductId, int Quantity)> items,
+        int orderItemId,
+        int productId,
+        int quantity,
         CancellationToken cancellationToken)
     {
-        if (items.Count == 0)
-            throw new InvalidOperationException("Đơn hàng chưa có món ăn.");
+        if (quantity <= 0)
+            throw new InvalidOperationException("Số lượng món ăn không hợp lệ.");
 
-        var productIds = items.Select(x => x.ProductId).Distinct().ToList();
         var bom = await context.ProductIngredients.AsNoTracking()
-            .Where(x => productIds.Contains(x.ProductId))
+            .Where(x => x.ProductId == productId)
             .ToListAsync(cancellationToken);
 
-        var productsWithoutBom = productIds
-            .Except(bom.Select(x => x.ProductId))
-            .ToList();
-        if (productsWithoutBom.Count > 0)
+        if (bom.Count == 0)
             throw new InvalidOperationException(
-                $"Món ăn chưa có định lượng nguyên liệu: {string.Join(", ", productsWithoutBom)}.");
+                $"Món ăn chưa có định lượng nguyên liệu: {productId}.");
 
-        var required = bom.Join(
-                items,
-                recipe => recipe.ProductId,
-                item => item.ProductId,
-                (recipe, item) => new { recipe.IngredientId, Amount = recipe.Quantity * item.Quantity })
+        var required = bom
             .GroupBy(x => x.IngredientId)
-            .ToDictionary(x => x.Key, x => x.Sum(y => y.Amount));
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(item => item.Quantity * quantity));
 
         if (required.Count == 0)
-            throw new InvalidOperationException("Đơn hàng chưa có định lượng nguyên liệu.");
+            throw new InvalidOperationException("Món ăn chưa có định lượng nguyên liệu.");
 
         var ingredients = await context.Ingredients
             .Where(x => required.Keys.Contains(x.Id))
@@ -249,9 +245,9 @@ public sealed class InventoryService(AppDbContext context) : IInventoryService
                 Quantity = -amount,
                 BeforeStock = before,
                 AfterStock = before - amount,
-                ReferenceType = "Order",
-                ReferenceId = orderId,
-                Note = "Order accepted"
+                ReferenceType = "OrderItem",
+                ReferenceId = orderItemId,
+                Note = $"Hoàn thành chế biến (đơn #{orderId})"
             });
         }
 

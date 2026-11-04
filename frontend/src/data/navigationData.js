@@ -24,9 +24,8 @@ export const navigationGroups = [
     items: [
       ['inventory', '◈', 'Nguyên vật liệu', '/manager/inventory'],
       ['bom', '⚖', 'Định lượng BOM', '/manager/bom'],
-      ['stock-in', '↔', 'Nhập kho', '/manager/stock-in'],
+      ['stock-movements', '↕', 'Biến động kho', '/manager/stock-movements'],
       ['receipts', '▤', 'Phiếu nhập hàng', '/manager/purchase-orders'],
-      ['stock-out', '↔', 'Xuất kho', '/manager/stock-out'],
       ['suppliers', '▱', 'Nhà cung cấp', '/manager/suppliers'],
     ],
   },
@@ -34,7 +33,7 @@ export const navigationGroups = [
     title: 'QUẢN TRỊ',
     items: [
       ['overview', '⌁', 'Tổng quan', '/manager'],
-      ['expenses', '₫', 'Quản lý chi tiêu', '/manager/expenses'],
+      ['expenses', '▥', 'Báo cáo tài chính', '/manager/expenses'],
       ['users', '♙', 'Người dùng & quyền', '/manager/users'],
       ['reports', '▥', 'Báo cáo'],
     ],

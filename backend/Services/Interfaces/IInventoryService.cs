@@ -45,8 +45,10 @@ public interface IInventoryService
         int ingredientId,
         CancellationToken cancellationToken);
 
-    Task DeductForOrderAsync(
+    Task DeductForOrderItemAsync(
         int orderId,
-        IReadOnlyList<(int ProductId, int Quantity)> items,
+        int orderItemId,
+        int productId,
+        int quantity,
         CancellationToken cancellationToken);
 }

@@ -12,16 +12,13 @@ namespace backend.Services.Implementations;
 public class OrderService : IOrderService
 {
     private readonly AppDbContext _context;
-    private readonly IInventoryService _inventoryService;
     private readonly IHubContext<OrderHub> _orderHub;
 
     public OrderService(
         AppDbContext context,
-        IInventoryService inventoryService,
         IHubContext<OrderHub> orderHub)
     {
         _context = context;
-        _inventoryService = inventoryService;
         _orderHub = orderHub;
     }
 
@@ -260,14 +257,6 @@ public class OrderService : IOrderService
         {
             throw new Exception(
                 "Không thể thay đổi đơn hàng đã kết thúc.");
-        }
-
-        if (status == "Accepted" && order.Status != "Accepted")
-        {
-            await _inventoryService.DeductForOrderAsync(
-                order.Id,
-                order.OrderItems.Select(x => (x.ProductId, x.Quantity)).ToList(),
-                CancellationToken.None);
         }
 
         order.Status = status;

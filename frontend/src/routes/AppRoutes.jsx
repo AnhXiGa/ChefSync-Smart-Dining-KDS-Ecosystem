@@ -36,9 +36,10 @@ export function AppRoutes() {
     <Route path="/manager/tables" element={<RoleRoute path="/manager/tables"><ManagerTablesPage /></RoleRoute>} />
     <Route path="/manager/menu" element={<RoleRoute path="/manager/menu"><AdminModulePage module="menu" /></RoleRoute>} />
     <Route path="/manager/categories" element={<RoleRoute path="/manager/categories"><AdminModulePage module="categories" /></RoleRoute>} />
-    <Route path="/manager/stock-in" element={<RoleRoute path="/manager/stock-in"><AdminModulePage module="stock-in" /></RoleRoute>} />
+    <Route path="/manager/stock-movements" element={<RoleRoute path="/manager/stock-movements"><AdminModulePage module="stock-movements" /></RoleRoute>} />
+    <Route path="/manager/stock-in" element={<RoleRoute path="/manager/stock-in"><Navigate to="/manager/stock-movements" replace /></RoleRoute>} />
     <Route path="/manager/purchase-orders" element={<RoleRoute path="/manager/purchase-orders"><AdminModulePage module="purchase-orders" /></RoleRoute>} />
-    <Route path="/manager/stock-out" element={<RoleRoute path="/manager/stock-out"><AdminModulePage module="stock-out" /></RoleRoute>} />
+    <Route path="/manager/stock-out" element={<RoleRoute path="/manager/stock-out"><Navigate to="/manager/stock-movements" replace /></RoleRoute>} />
     <Route path="/manager/suppliers" element={<RoleRoute path="/manager/suppliers"><AdminModulePage module="suppliers" /></RoleRoute>} />
     <Route path="/manager/expenses" element={<RoleRoute path="/manager/expenses"><AdminModulePage module="expenses" /></RoleRoute>} />
     <Route path="/manager/users" element={<RoleRoute path="/manager/users"><AdminModulePage module="users" /></RoleRoute>} />

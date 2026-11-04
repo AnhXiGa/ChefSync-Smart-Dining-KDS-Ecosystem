@@ -68,34 +68,86 @@ public sealed class CustomerController : ControllerBase
     public async Task<IActionResult> GetMenu([FromQuery] string? search, [FromQuery] int? categoryId)
     {
         var normalizedSearch = string.IsNullOrWhiteSpace(search) ? string.Empty : search.Trim();
-
-        var query = _context.Categories
+        var categories = await _context.Categories
             .AsNoTracking()
             .Where(c => c.IsActive)
+            .Include(c => c.Products)
+                .ThenInclude(p => p.ProductIngredients)
+                .ThenInclude(pi => pi.Ingredient)
             .OrderBy(c => c.DisplayOrder)
-            .Select(c => new CategoryWithProductsDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                DisplayOrder = c.DisplayOrder,
-                Products = c.Products
-                    .Where(p => p.IsAvailable &&
-                        (!categoryId.HasValue || p.CategoryId == categoryId.Value) &&
-                        (string.IsNullOrEmpty(normalizedSearch) || p.Name.ToLower().Contains(normalizedSearch.ToLower())))
-                    .Select(p => new ProductDto
-                    {
-                        Id = p.Id,
-                        CategoryId = p.CategoryId,
-                        Name = p.Name,
-                        Description = p.Description,
-                        Price = p.Price,
-                        ImageUrl = p.ImageUrl,
-                        PreparationTime = p.PreparationTime
-                    })
-                    .ToList()
-            });
+            .ToListAsync();
 
-        var result = await query.ToListAsync();
+        var bom = await _context.ProductIngredients
+            .AsNoTracking()
+            .Include(pi => pi.Ingredient)
+            .ToListAsync();
+
+        var reservedItems = await _context.OrderItems
+            .AsNoTracking()
+            .Include(item => item.Order)
+            .Where(item =>
+                item.Status != "Ready" &&
+                item.Status != "Served" &&
+                item.Status != "Cancelled" &&
+                item.Order.Status != "Completed" &&
+                item.Order.Status != "Cancelled")
+            .Select(item => new { item.ProductId, item.Quantity })
+            .ToListAsync();
+
+        var reservedByProduct = reservedItems
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity));
+
+        var availableQuantities = new Dictionary<int, int>();
+        foreach (var product in categories.SelectMany(c => c.Products))
+        {
+            var recipe = bom.Where(pi => pi.ProductId == product.Id).ToList();
+            if (recipe.Count == 0)
+            {
+                availableQuantities[product.Id] = 999;
+                continue;
+            }
+
+            var capacities = recipe.Select(pi =>
+            {
+                var reservedQuantity = reservedByProduct
+                    .Where(pair => pair.Key == product.Id)
+                    .Select(pair => pair.Value)
+                    .FirstOrDefault();
+                var reservedUsage = recipe
+                    .Where(pi2 => pi2.IngredientId == pi.IngredientId)
+                    .Sum(pi2 => pi2.Quantity * reservedQuantity);
+                var usableStock = Math.Max(0m, pi.Ingredient.CurrentStock - reservedUsage);
+                return pi.Quantity > 0 ? (int)Math.Floor(usableStock / pi.Quantity) : 0;
+            });
+            availableQuantities[product.Id] = capacities.Any() ? capacities.Min() : 0;
+        }
+
+        var result = categories.Select(c => new CategoryWithProductsDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            DisplayOrder = c.DisplayOrder,
+            Products = c.Products
+                .Where(p => p.IsAvailable &&
+                    (!categoryId.HasValue || p.CategoryId == categoryId.Value) &&
+                    (string.IsNullOrEmpty(normalizedSearch) ||
+                        p.Name.ToLower().Contains(normalizedSearch.ToLower())))
+                .Select(p => new ProductDto
+                {
+                    Id = p.Id,
+                    CategoryId = p.CategoryId,
+                    Name = p.Name,
+                    Description = p.Description,
+                    Price = p.Price,
+                    ImageUrl = p.ImageUrl,
+                    PreparationTime = p.PreparationTime,
+                    AvailableQuantity = availableQuantities.TryGetValue(p.Id, out var quantity)
+                        ? quantity
+                        : 0
+                })
+                .ToList()
+        }).ToList();
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch) || categoryId.HasValue)
             result = result.Where(c => c.Products.Any()).ToList();
@@ -276,6 +328,54 @@ public sealed class CustomerController : ControllerBase
         var products = await _context.Products
             .Where(p => productIds.Contains(p.Id) && p.IsAvailable)
             .ToDictionaryAsync(p => p.Id);
+
+        var requestedTotals = request.Items
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity));
+
+        var recipes = await _context.ProductIngredients
+            .AsNoTracking()
+            .Include(pi => pi.Ingredient)
+            .Where(pi => productIds.Contains(pi.ProductId))
+            .ToListAsync();
+
+        var reservedItems = await _context.OrderItems
+            .AsNoTracking()
+            .Where(item =>
+                item.Status != "Ready" &&
+                item.Status != "Served" &&
+                item.Status != "Cancelled" &&
+                item.Order.Status != "Completed" &&
+                item.Order.Status != "Cancelled")
+            .Select(item => new { item.ProductId, item.Quantity })
+            .ToListAsync();
+
+        var reservedByProduct = reservedItems
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity));
+
+        foreach (var productId in productIds)
+        {
+            var recipe = recipes.Where(pi => pi.ProductId == productId).ToList();
+            if (recipe.Count == 0)
+                continue;
+
+            var reservedQuantity = reservedByProduct.GetValueOrDefault(productId);
+            foreach (var requiredIngredient in recipe)
+            {
+                var reservedUsage = requiredIngredient.Quantity * reservedQuantity;
+                var requestedUsage = requiredIngredient.Quantity * requestedTotals.GetValueOrDefault(productId);
+                var usableStock = requiredIngredient.Ingredient.CurrentStock - reservedUsage;
+                if (requestedUsage > usableStock)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"Nguyên liệu {requiredIngredient.Ingredient.Name} không đủ để thêm món này. " +
+                            $"Hiện chỉ còn {Math.Max(0, (int)Math.Floor(usableStock / requiredIngredient.Quantity))} phần."
+                    });
+                }
+            }
+        }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 

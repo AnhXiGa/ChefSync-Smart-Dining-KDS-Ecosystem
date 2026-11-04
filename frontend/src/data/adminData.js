@@ -23,19 +23,14 @@ export const adminModules = {
     description: "Thiết lập nguyên liệu cấu thành và giá vốn cho từng món.",
     rows: [],
   },
-  "stock-in": {
-    title: "Nhập kho",
-    description: "Theo dõi các phiếu đã nhận và số lượng nguyên liệu đã cộng vào kho.",
-    rows: [],
-  },
   "purchase-orders": {
     title: "Phiếu nhập hàng",
     description: "Tạo phiếu nhập hàng, theo dõi trạng thái và xác nhận hàng đã nhận.",
     rows: [],
   },
-  "stock-out": {
-    title: "Xuất kho & biến động",
-    description: "Kiểm soát nguyên liệu đã xuất cho bếp và các điều chỉnh tồn kho.",
+  "stock-movements": {
+    title: "Biến động kho",
+    description: "Theo dõi nhập, tiêu hao và điều chỉnh tồn kho trong một nhật ký.",
     rows: [],
   },
   suppliers: {
@@ -44,8 +39,8 @@ export const adminModules = {
     rows: [],
   },
   expenses: {
-    title: "Quản lý chi tiêu",
-    description: "Theo dõi chi phí vận hành, mua hàng và ngân sách nhà hàng.",
+    title: "Báo cáo tài chính",
+    description: "Tổng hợp doanh thu, thanh toán, món bán chạy và giá vốn nguyên liệu.",
     rows: [],
   },
   users: {
