@@ -79,7 +79,14 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    await AccountSeeder.SeedManagerAsync(scope.ServiceProvider);
+    var serviceProvider = scope.ServiceProvider;
+
+    // Seed tài khoản quản lý
+    await AccountSeeder.SeedManagerAsync(serviceProvider);
+
+    // Seed dữ liệu nhà hàng
+    var context = serviceProvider.GetRequiredService<AppDbContext>();
+    await SmartPosSeeder.SeedAsync(context);
 }
 
 // =====================================================

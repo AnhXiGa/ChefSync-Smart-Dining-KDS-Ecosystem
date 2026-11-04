@@ -101,3 +101,26 @@ Desktop.ini
 *.temp
 *.swp
 *.bak
+
+# ASP.NET Core
+**/publish/
+**/artifacts/
+
+# Visual Studio
+*.cache
+*.pidb
+*.svclog
+
+# React / Node
+**/.next/
+**/.nuxt/
+**/.output/
+
+# Test / Coverage
+**/coverage/
+**/TestResults/
+
+# Database backups
+*.bak
+*.backup
+*.dump
