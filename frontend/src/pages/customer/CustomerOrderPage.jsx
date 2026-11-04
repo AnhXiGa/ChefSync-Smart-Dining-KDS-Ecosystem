@@ -2,10 +2,13 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { menuItems, formatMoney } from "../../data/posData";
 import { FoodImage, StatusBadge } from "../../components/shared/Ui";
+import { OrderStatusPanel } from "../../components/shared/OrderStatusPanel";
+import { useTableOrderUpdates } from "../../hooks/useTableOrderUpdates";
 
 export function CustomerOrderPage() {
   const { tableId = "5" } = useParams();
   const [cart, setCart] = useState([]);
+  const orderUpdates = useTableOrderUpdates(tableId);
   const add = (item) =>
     setCart((items) =>
       items.some((entry) => entry.name === item.name)
@@ -31,6 +34,7 @@ export function CustomerOrderPage() {
           <h1>Đặt món tại bàn</h1>
           <span>Chọn món yêu thích, bếp sẽ chuẩn bị ngay cho bạn.</span>
         </div>
+        <OrderStatusPanel {...orderUpdates} />
         <div className="customer-categories">
           <button className="selected">Tất cả</button>
           <button>Món chính</button>

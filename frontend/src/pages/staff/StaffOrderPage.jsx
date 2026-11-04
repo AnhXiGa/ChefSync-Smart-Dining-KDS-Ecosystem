@@ -3,10 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { menuItems } from "../../data/posData";
 import { BackofficeLayout, PageTitle } from "../../components/shared/Ui";
 import { MenuCard, OrderSummary } from "../../components/staff/OrderComponents";
+import { OrderStatusPanel } from "../../components/shared/OrderStatusPanel";
+import { useTableOrderUpdates } from "../../hooks/useTableOrderUpdates";
 
 export function StaffOrderPage() {
   const { tableId = "5" } = useParams();
   const navigate = useNavigate();
+  const orderUpdates = useTableOrderUpdates(tableId);
   const [category, setCategory] = useState("Tất cả");
   const [cart, setCart] = useState([]);
   const filtered =
@@ -48,6 +51,7 @@ export function StaffOrderPage() {
             </div>
           }
         />
+        <OrderStatusPanel {...orderUpdates} />
         <div className="order-layout">
           <section>
             <div className="search">
