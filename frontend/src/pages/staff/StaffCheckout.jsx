@@ -108,12 +108,12 @@ export function StaffCheckout() {
         <div className="payment-modal-overlay" role="presentation">
           <section className="payment-modal receipt-modal" role="dialog" aria-modal="true">
             <p className="eyebrow">THANH TOÁN THÀNH CÔNG</p>
-            <h2>Hóa đơn {receipt.order.orderCode}</h2>
-            <p>Bàn {receipt.order.tableNumber} · {money(receipt.order.totalAmount)}</p>
+            <OrderInvoice order={receipt.order} />
             <PaymentStatus status={receipt.payment.status} />
+            <p>Phương thức: {receipt.payment.paymentMethod === "Cash" ? "Tiền mặt" : "Chuyển khoản SePay"}</p>
             {receipt.payment.transactionCode && <p>Mã giao dịch: {receipt.payment.transactionCode}</p>}
-            <div className="table-operation-actions">
-              <button className="secondary" onClick={() => window.print()}>In hóa đơn</button>
+            <div className="table-operation-actions receipt-actions">
+              <button className="secondary" onClick={() => window.print()}>In / lưu PDF</button>
               <button className="primary" onClick={() => setReceipt(null)}>Đóng</button>
             </div>
           </section>

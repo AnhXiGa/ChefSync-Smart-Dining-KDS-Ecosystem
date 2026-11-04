@@ -6,6 +6,13 @@ export const adminModules = {
     columns: ["Món ăn", "Danh mục", "Giá bán", "Thời gian", "Trạng thái"],
     rows: [],
   },
+  categories: {
+    title: "Quản lý danh mục",
+    description: "Danh sách danh mục và số lượng món đang phục vụ.",
+    action: "＋ Thêm danh mục",
+    columns: ["Danh mục", "Số món", "Thứ tự", "Trạng thái"],
+    rows: [],
+  },
   inventory: {
     title: "Nguyên vật liệu",
     description: "Theo dõi tồn kho, định mức tối thiểu và hạn sử dụng.",

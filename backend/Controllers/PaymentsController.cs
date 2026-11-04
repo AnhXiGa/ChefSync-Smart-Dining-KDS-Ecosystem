@@ -133,7 +133,19 @@ public sealed class PaymentsController(
                 "Bearer ",
                 StringComparison.OrdinalIgnoreCase)
                 ? authorization["Bearer ".Length..].Trim()
-                : Request.Headers["X-API-Key"].ToString().Trim();
+                : !string.IsNullOrWhiteSpace(authorization)
+                    ? authorization.Trim()
+                    : Request.Headers["X-API-Key"].ToString().Trim();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            token = Request.Headers["ApiKey"].ToString().Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            token = Request.Headers["SePay-API-Key"].ToString().Trim();
+        }
 
         return !string.IsNullOrWhiteSpace(token) &&
             CryptographicOperations.FixedTimeEquals(

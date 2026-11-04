@@ -35,6 +35,7 @@ export function AppRoutes() {
     <Route path="/manager" element={<RoleRoute path="/manager"><ManagerDashboardPage /></RoleRoute>} />
     <Route path="/manager/tables" element={<RoleRoute path="/manager/tables"><ManagerTablesPage /></RoleRoute>} />
     <Route path="/manager/menu" element={<RoleRoute path="/manager/menu"><AdminModulePage module="menu" /></RoleRoute>} />
+    <Route path="/manager/categories" element={<RoleRoute path="/manager/categories"><AdminModulePage module="categories" /></RoleRoute>} />
     <Route path="/manager/stock-in" element={<RoleRoute path="/manager/stock-in"><AdminModulePage module="stock-in" /></RoleRoute>} />
     <Route path="/manager/purchase-orders" element={<RoleRoute path="/manager/purchase-orders"><AdminModulePage module="purchase-orders" /></RoleRoute>} />
     <Route path="/manager/stock-out" element={<RoleRoute path="/manager/stock-out"><AdminModulePage module="stock-out" /></RoleRoute>} />

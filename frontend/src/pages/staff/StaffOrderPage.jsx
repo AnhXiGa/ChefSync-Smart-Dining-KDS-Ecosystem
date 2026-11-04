@@ -7,6 +7,9 @@ import { OrderStatusPanel } from "../../components/shared/OrderStatusPanel";
 import { useTableOrderUpdates } from "../../hooks/useTableOrderUpdates";
 import { TableOperationsModal } from "../../components/staff/TableOperationsModal";
 
+const money = (value) => `${new Intl.NumberFormat("vi-VN").format(value || 0)} ₫`;
+const cashDenominations = [50000, 100000, 200000, 500000, 1000000];
+
 export function StaffOrderPage() {
   const { tableId = "5" } = useParams();
   const navigate = useNavigate();
@@ -17,6 +20,7 @@ export function StaffOrderPage() {
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [receivedAmount, setReceivedAmount] = useState("");
   const [payment, setPayment] = useState(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const orderUpdates = useTableOrderUpdates(tableId);
   const loadOperationsData = useCallback(async () => {
@@ -41,6 +45,11 @@ export function StaffOrderPage() {
       order.tableId === Number(tableId) &&
       !["Completed", "Cancelled"].includes(order.status),
   );
+  const received = Number(receivedAmount);
+  const cashAmountValid =
+    Number.isFinite(received) &&
+    received >= (activeOrder?.totalAmount || 0);
+  const exactAmount = Math.ceil((activeOrder?.totalAmount || 0) / 1000) * 1000;
   const currentTable = tables.find((table) => table.id === Number(tableId));
   const completeOperation = async (updatedOrder) => {
     await loadOperationsData();
@@ -134,7 +143,10 @@ export function StaffOrderPage() {
           <OrderSummary
             cart={[]}
             total={0}
-            onPayment={() => setPayment({ open: true })}
+            onPayment={() => {
+              setPayment(null);
+              setPaymentOpen(true);
+            }}
             paymentDisabled={!activeOrder}
             existingOrder={activeOrder}
           />
@@ -150,7 +162,7 @@ export function StaffOrderPage() {
           onSuccess={completeOperation}
         />
       )}
-      {payment?.open && (
+      {paymentOpen && (
         <div className="table-operation-overlay" role="presentation">
           <section className="table-operation-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
             <div className="table-operation-heading">
@@ -158,35 +170,86 @@ export function StaffOrderPage() {
                 <p className="eyebrow">THANH TOÁN</p>
                 <h2 id="payment-title">Thanh toán {activeOrder?.orderCode}</h2>
               </div>
-              <button className="table-operation-close" onClick={() => setPayment(null)} aria-label="Đóng">×</button>
+              <button className="table-operation-close" onClick={() => setPaymentOpen(false)} aria-label="Đóng">×</button>
             </div>
             <p className="table-operation-order">
-              Tổng tiền: {new Intl.NumberFormat("vi-VN").format(activeOrder?.totalAmount || 0)} ₫
+              Tổng tiền cần thu: <strong>{money(activeOrder?.totalAmount)}</strong>
             </p>
             <label className="table-operation-field">
               Phương thức
-              <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
-                <option value="Cash">Tiền mặt</option>
-                <option value="BankTransfer">Chuyển khoản</option>
+                <select
+                  value={paymentMethod}
+                  onChange={(event) => {
+                    setPaymentMethod(event.target.value);
+                    setPayment(null);
+                    setError("");
+                  }}
+                >
+                  <option value="Cash">Tiền mặt</option>
+                  <option value="BankTransfer">Chuyển khoản SePay QR</option>
               </select>
-            </label>
-            {paymentMethod === "Cash" && (
-              <label className="table-operation-field">
-                Tiền khách đưa
-                <input
-                  type="number"
-                  min={activeOrder?.totalAmount || 0}
-                  value={receivedAmount}
-                  onChange={(event) => setReceivedAmount(event.target.value)}
-                  placeholder="Nhập số tiền"
-                />
               </label>
+              {paymentMethod === "BankTransfer" && !payment && (
+                <p className="payment-method-hint">
+                  Bấm “Tạo QR thanh toán” để backend sinh mã QR cho đúng số tiền và nội dung đơn hàng.
+                </p>
+              )}
+            {paymentMethod === "Cash" && (
+              <div className="cash-payment-entry">
+                <label className="table-operation-field">
+                Tiền khách đưa
+                  <div className="cash-amount-input">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={receivedAmount ? new Intl.NumberFormat("vi-VN").format(received) : ""}
+                      onChange={(event) => {
+                        setReceivedAmount(event.target.value.replace(/\D/g, ""));
+                        setError("");
+                      }}
+                      placeholder="Nhập số tiền"
+                      aria-label="Số tiền khách đưa"
+                    />
+                    <span>VND</span>
+                  </div>
+                </label>
+                <div className="cash-quick-heading">
+                  <span>Mệnh giá nhanh</span>
+                  <button
+                    type="button"
+                    onClick={() => setReceivedAmount(String(exactAmount))}
+                    disabled={paymentBusy}
+                  >
+                    Đủ tiền · {money(exactAmount)}
+                  </button>
+                </div>
+                <div className="cash-denominations">
+                  {cashDenominations.map((amount) => (
+                    <button
+                      type="button"
+                      key={amount}
+                      onClick={() => setReceivedAmount(String(amount))}
+                      disabled={paymentBusy}
+                    >
+                      {money(amount)}
+                    </button>
+                  ))}
+                </div>
+                <p className={`checkout-change ${cashAmountValid ? "is-valid" : ""}`}>
+                  Tiền thừa: <strong>{cashAmountValid ? money(received - activeOrder.totalAmount) : "—"}</strong>
+                </p>
+              </div>
             )}
             {payment?.qrCodeUrl && (
               <div className="payment-qr-result">
                 <img src={payment.qrCodeUrl} alt="Mã QR thanh toán" />
                 <p>Nội dung chuyển khoản: <strong>{payment.transferContent}</strong></p>
                 <p>Trạng thái: {payment.status}</p>
+              </div>
+            )}
+            {payment?.id && paymentMethod === "BankTransfer" && !payment.qrCodeUrl && (
+              <div className="table-operation-error" role="alert">
+                Backend đã tạo giao dịch nhưng chưa trả về QR. Kiểm tra BankCode và BankAccount trong cấu hình backend rồi thử lại.
               </div>
             )}
             {payment?.changeAmount !== undefined && payment?.changeAmount !== null && (
@@ -200,12 +263,12 @@ export function StaffOrderPage() {
               </button>
             )}
             {!payment?.id && (
-              <button className="primary full" onClick={createPayment} disabled={paymentBusy}>
-                {paymentBusy ? "Đang tạo…" : "Tạo thanh toán"}
+              <button className="primary full" onClick={createPayment} disabled={paymentBusy || (paymentMethod === "Cash" && !cashAmountValid)}>
+                {paymentBusy ? "Đang tạo…" : paymentMethod === "BankTransfer" ? "Tạo QR thanh toán" : "Tạo thanh toán"}
               </button>
             )}
             {payment?.qrCodeUrl && (
-              <button className="secondary full" onClick={() => setPayment(null)}>
+              <button className="secondary full" onClick={() => setPaymentOpen(false)}>
                 Đóng sau khi chuyển khoản
               </button>
             )}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { confirmCashPayment, createPayment } from "../../../api/paymentApi";
 
 const money = (value) => `${new Intl.NumberFormat("vi-VN").format(value || 0)} ₫`;
-const cashDenominations = [50000, 100000, 200000, 500000];
+const cashDenominations = [50000, 100000, 200000, 500000, 1000000];
 
 export function CashPaymentModal({ order, existingPayment, onClose, onSuccess }) {
   const [receivedAmount, setReceivedAmount] = useState(

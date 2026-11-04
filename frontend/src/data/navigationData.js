@@ -7,7 +7,6 @@ export const navigationGroups = [
     title: 'VẬN HÀNH',
     items: [
       ['tables', '▦', 'Quản lý bàn', '/staff/tables'],
-      ['order', '▤', 'Chi tiết bàn', '/staff/order/5'],
       ['checkout', '▣', 'Checkout', '/staff/checkout'],
       ['payments', '▤', 'Lịch sử thanh toán', '/staff/payments'],
       ['kds', '♨', 'Bếp KDS', '/kitchen'],
@@ -17,7 +16,7 @@ export const navigationGroups = [
     title: 'THỰC ĐƠN',
     items: [
       ['menu', '♜', 'Món ăn', '/manager/menu'],
-      ['categories', '▱', 'Danh mục', '/manager/menu'],
+      ['categories', '▱', 'Danh mục', '/manager/categories'],
     ],
   },
   {

@@ -11,7 +11,11 @@ export function OrderInvoice({ order }) {
         <div>
           <p className="eyebrow">HÓA ĐƠN</p>
           <h2>{order.orderCode}</h2>
-          <p>Bàn {order.tableNumber} · {new Date(order.createdAt).toLocaleString("vi-VN")}</p>
+          <p>Bàn {order.tableNumber}</p>
+          <p className="checkout-time-range">
+            Vào bàn: {new Date(order.createdAt).toLocaleString("vi-VN")}
+            {order.completedAt && <> · Kết thúc: {new Date(order.completedAt).toLocaleString("vi-VN")}</>}
+          </p>
         </div>
       </div>
       <div className="checkout-items">

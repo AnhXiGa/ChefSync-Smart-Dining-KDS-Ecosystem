@@ -39,10 +39,12 @@ export function OrderSummary({
     <aside className="order-summary">
       <h2>{existingOrder?.orderCode || "Chưa có đơn"}</h2>
       <p>Gọi món qua QR · {displayItems.length} món</p>
-      <div className="summary-badges">
-        <StatusBadge>Đơn: Đang thực hiện</StatusBadge>
-        <StatusBadge kind="orange">Chưa thanh toán</StatusBadge>
-      </div>
+      {existingOrder && (
+        <div className="summary-badges">
+          <StatusBadge>Đơn: Đang thực hiện</StatusBadge>
+          <StatusBadge kind="orange">Chưa thanh toán</StatusBadge>
+        </div>
+      )}
       {displayItems.length === 0 ? (
         <div className="empty-order">
           Chưa có món mới.
