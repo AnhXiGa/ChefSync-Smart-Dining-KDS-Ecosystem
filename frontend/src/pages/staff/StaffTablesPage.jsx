@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { initialTables } from "../../data/posData";
+import axiosClient from "../../api/axiosClient";
 import { BackofficeLayout, PageTitle } from "../../components/shared/Ui";
 import {
   TableCard,
@@ -9,8 +9,41 @@ import {
 
 export function StaffTablesPage() {
   const navigate = useNavigate();
-  const [tables] = useState(initialTables);
-  const [selectedTable, setSelectedTable] = useState(5);
+  const [tables, setTables] = useState([]);
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [error, setError] = useState("");
+  const loadTables = useCallback(async () => {
+    try {
+      const [{ data }, { data: orders }] = await Promise.all([
+        axiosClient.get("/api/tables"),
+        axiosClient.get("/api/orders"),
+      ]);
+      const mappedTables = data.map((table) => ({
+        ...table,
+        activeOrder: orders.find(
+          (order) =>
+            order.tableId === table.id &&
+            !["Completed", "Cancelled"].includes(order.status),
+        ),
+        status: {
+          Available: "empty",
+          Occupied: "occupied",
+          Reserved: "reserved",
+          Maintenance: "maintenance",
+        }[table.status] || "empty",
+      }));
+      // oxlint-disable-next-line react/set-state-in-effect
+      setTables(mappedTables);
+      // oxlint-disable-next-line react/set-state-in-effect
+      // oxlint-disable-next-line react/set-state-in-effect
+      setError("");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Không tải được danh sách bàn.");
+    }
+  }, []);
+  useEffect(() => {
+    void loadTables();
+  }, [loadTables]);
   const stats = [
     [
       "Trống",
@@ -33,16 +66,19 @@ export function StaffTablesPage() {
       "Tạm ngưng sử dụng",
     ],
   ];
-  const openOrder = (id = selectedTable) => navigate(`/staff/order/${id}`);
+  const activeTableId = selectedTable ?? tables[0]?.id;
+  const openOrder = (id = activeTableId) => {
+    if (id) navigate(`/staff/order/${id}`);
+  };
   return (
     <BackofficeLayout title="Minh Anh · Nhân viên">
       <main className="page">
         <PageTitle
           title="Quản lý bàn"
-          description="Ca trưa · 24 bàn tại 2 khu vực · Sẵn sàng phục vụ"
+          description="Danh sách bàn được đồng bộ từ hệ thống nhà hàng"
           action={
             <button className="primary" onClick={() => openOrder()}>
-              ＋ Tạo đơn mới
+              Quản lý bàn
             </button>
           }
         />
@@ -58,10 +94,9 @@ export function StaffTablesPage() {
         <div className="workspace">
           <section>
             <div className="tabs">
-              <button className="tab">Tất cả khu vực</button>
-              <button className="tab selected">Sảnh chính · 12</button>
-              <button className="tab">Sân vườn · 12</button>
+              <button className="tab selected">Tất cả bàn · {tables.length}</button>
             </div>
+            {error && <div role="alert">{error}</div>}
             <div className="table-grid">
               {tables.map((table) => (
                 <TableCard
@@ -74,7 +109,7 @@ export function StaffTablesPage() {
             </div>
           </section>
           <TableDetails
-            table={tables.find((table) => table.id === selectedTable)}
+            table={tables.find((table) => table.id === activeTableId)}
             onOpenOrder={() => openOrder()}
           />
         </div>

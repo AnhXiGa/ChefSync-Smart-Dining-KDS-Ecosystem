@@ -2,6 +2,10 @@ namespace backend.Configuration;
 
 public class PaymentOptions
 {
+    public string SePayApiUrl { get; set; } = string.Empty;
+
+    public string SePayAccessToken { get; set; } = string.Empty;
+
     public string BankCode { get; set; } = string.Empty;
 
     public string BankAccount { get; set; } = string.Empty;

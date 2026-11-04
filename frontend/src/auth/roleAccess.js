@@ -26,7 +26,7 @@ export function getLandingPath(user) {
 export function canAccessPath(path, roles = []) {
   if (roles.some((role) => adminRoles.includes(role))) return true;
 
-  if (path === "/staff/tables" || path.startsWith("/staff/order/") || path === "/staff/payments") {
+  if (path === "/staff/tables" || path === "/staff/checkout" || path.startsWith("/staff/order/") || path === "/staff/payments") {
     return roles.includes("Waiter");
   }
   if (path === "/kitchen") return roles.includes("Chef");

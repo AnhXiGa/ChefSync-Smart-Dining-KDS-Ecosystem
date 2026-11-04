@@ -188,6 +188,29 @@ public class PaymentService : IPaymentService
         return MapToResponse(payment);
     }
 
+    public async Task<List<PaymentHistoryResponse>> GetHistoryAsync()
+    {
+        return await _context.Payments
+            .AsNoTracking()
+            .Include(payment => payment.Order)
+            .ThenInclude(order => order.Table)
+            .OrderByDescending(payment => payment.CreatedAt)
+            .Select(payment => new PaymentHistoryResponse
+            {
+                Id = payment.Id,
+                OrderId = payment.OrderId,
+                OrderCode = payment.Order.OrderCode,
+                TableNumber = payment.Order.Table.TableNumber,
+                Amount = payment.Amount,
+                PaymentMethod = payment.PaymentMethod,
+                Status = payment.Status,
+                TransactionCode = payment.TransactionCode,
+                PaidAt = payment.PaidAt,
+                CreatedAt = payment.CreatedAt
+            })
+            .ToListAsync();
+    }
+
     // =========================================================
     // CONFIRM CASH
     // =========================================================

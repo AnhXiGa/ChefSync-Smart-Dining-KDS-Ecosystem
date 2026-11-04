@@ -1,5 +1,9 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using backend.Configuration;
 using backend.DTOs.Payments;
+using Microsoft.Extensions.Options;
 using backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,7 +13,8 @@ namespace backend.Controllers;
 [Route("api/payments")]
 [Route("api/payment")]
 public sealed class PaymentsController(
-    IPaymentService paymentService) : ApiScaffoldController
+    IPaymentService paymentService,
+    IOptions<PaymentOptions> paymentOptions) : ApiScaffoldController
 {
     [HttpPost]
     public async Task<IActionResult> CreatePayment(
@@ -83,6 +88,15 @@ public sealed class PaymentsController(
     public async Task<IActionResult> SePayWebhook(
         [FromBody] SePayWebhookRequest request)
     {
+        if (!IsValidSePayRequest())
+        {
+            return Unauthorized(new
+            {
+                success = false,
+                message = "SePay webhook authentication failed."
+            });
+        }
+
         try
         {
             var result = await paymentService.ProcessSePayWebhookAsync(request);
@@ -98,9 +112,38 @@ public sealed class PaymentsController(
         }
     }
 
+    private bool IsValidSePayRequest()
+    {
+        var configuredToken =
+            paymentOptions.Value.SePayAccessToken;
+
+        if (string.IsNullOrWhiteSpace(configuredToken))
+        {
+            return false;
+        }
+
+        var authorization =
+            Request.Headers.Authorization.ToString();
+
+        var token = authorization.StartsWith(
+                "Apikey ",
+                StringComparison.OrdinalIgnoreCase)
+            ? authorization["Apikey ".Length..].Trim()
+            : authorization.StartsWith(
+                "Bearer ",
+                StringComparison.OrdinalIgnoreCase)
+                ? authorization["Bearer ".Length..].Trim()
+                : Request.Headers["X-API-Key"].ToString().Trim();
+
+        return !string.IsNullOrWhiteSpace(token) &&
+            CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(token),
+                Encoding.UTF8.GetBytes(configuredToken));
+    }
+
     [HttpGet]
-    public IActionResult GetPayments() =>
-        NotImplementedForDemo();
+    public async Task<IActionResult> GetPayments()
+        => Ok(await paymentService.GetHistoryAsync());
 
     [HttpGet("/api/orders/{orderId:int}/payments")]
     public IActionResult GetOrderPayments(int orderId) =>
