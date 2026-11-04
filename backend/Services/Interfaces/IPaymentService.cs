@@ -11,6 +11,8 @@ public interface IPaymentService
 
     Task<PaymentResponse?> GetByOrderIdAsync(int orderId);
 
+    Task<List<PaymentHistoryResponse>> GetHistoryAsync();
+
     Task<PaymentResponse> ConfirmCashPaymentAsync(int paymentId);
 
     Task<bool> CancelPaymentAsync(int paymentId);

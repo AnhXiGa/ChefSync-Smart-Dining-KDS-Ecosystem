@@ -1,11 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { menuItems, formatMoney } from "../../data/posData";
+import axiosClient from "../../api/axiosClient";
+import { formatMoney } from "../../data/posData";
 import { FoodImage, StatusBadge } from "../../components/shared/Ui";
+import { OrderStatusPanel } from "../../components/shared/OrderStatusPanel";
+import { useTableOrderUpdates } from "../../hooks/useTableOrderUpdates";
 
 export function CustomerOrderPage() {
   const { tableId = "5" } = useParams();
+  const [menuItems, setMenuItems] = useState([]);
+  const [error, setError] = useState("");
   const [cart, setCart] = useState([]);
+  const orderUpdates = useTableOrderUpdates(tableId);
+  useEffect(() => {
+    axiosClient.get("/api/customer/menu")
+      .then(({ data }) => setMenuItems(data.flatMap((group) => group.products.map((product) => ({
+        ...product,
+        category: group.name,
+        time: product.preparationTime ? `${product.preparationTime} phút` : "",
+        tone: "default",
+      })))))
+      .catch((requestError) => setError(requestError.response?.data?.message || "Không tải được thực đơn."));
+  }, []);
   const add = (item) =>
     setCart((items) =>
       items.some((entry) => entry.name === item.name)
@@ -31,6 +47,8 @@ export function CustomerOrderPage() {
           <h1>Đặt món tại bàn</h1>
           <span>Chọn món yêu thích, bếp sẽ chuẩn bị ngay cho bạn.</span>
         </div>
+        <OrderStatusPanel {...orderUpdates} />
+        {error && <div role="alert">{error}</div>}
         <div className="customer-categories">
           <button className="selected">Tất cả</button>
           <button>Món chính</button>

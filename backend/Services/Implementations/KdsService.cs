@@ -50,6 +50,7 @@ public sealed class KdsService(
                 order.Note,
                 AsUtcOffset(order.CreatedAt),
                 order.OrderItems
+                    .Where(item => item.Status != "Cancelled")
                     .OrderBy(item => item.CreatedAt)
                     .Select(item => MapOrderItem(item, order))
                     .ToList()))
@@ -62,7 +63,8 @@ public sealed class KdsService(
     {
         var query = context.OrderItems
             .AsNoTracking()
-            .Where(item => ActiveOrderStatuses.Contains(item.Order.Status))
+            .Where(item => ActiveOrderStatuses.Contains(item.Order.Status) &&
+                item.Status != "Cancelled")
             .Include(item => item.Order)
                 .ThenInclude(order => order.Table)
             .AsQueryable();
@@ -134,12 +136,19 @@ public sealed class KdsService(
         }
 
         var response = MapOrderItem(item, item.Order);
-        await orderHub.Clients
-            .Group(OrderHub.GetOrderGroup(item.OrderId))
-            .SendAsync(
-                "OrderItemStatusChanged",
-                response,
-                cancellationToken);
+        await Task.WhenAll(
+            orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(item.OrderId))
+                .SendAsync(
+                    "OrderItemStatusChanged",
+                    response,
+                    cancellationToken),
+            orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync(
+                    "OrderItemStatusChanged",
+                    response,
+                    cancellationToken));
 
         return response;
     }
@@ -153,7 +162,8 @@ public sealed class KdsService(
                 cancellationToken);
 
         var counts = await context.OrderItems
-            .Where(item => ActiveOrderStatuses.Contains(item.Order.Status))
+            .Where(item => ActiveOrderStatuses.Contains(item.Order.Status) &&
+                item.Status != "Cancelled")
             .GroupBy(item => item.Status)
             .Select(group => new
             {

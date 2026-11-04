@@ -6,6 +6,8 @@ namespace backend.Hubs;
 
 public sealed class OrderHub(AppDbContext context) : Hub
 {
+    public const string KitchenGroupName = "kitchen";
+
     public async Task JoinOrder(int orderId)
     {
         if (orderId <= 0 ||
@@ -32,6 +34,18 @@ public sealed class OrderHub(AppDbContext context) : Hub
             GetOrderGroup(orderId),
             Context.ConnectionAborted);
     }
+
+    public Task JoinKitchen() =>
+        Groups.AddToGroupAsync(
+            Context.ConnectionId,
+            KitchenGroupName,
+            Context.ConnectionAborted);
+
+    public Task LeaveKitchen() =>
+        Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            KitchenGroupName,
+            Context.ConnectionAborted);
 
     public static string GetOrderGroup(int orderId) => $"order:{orderId}";
 }

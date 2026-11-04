@@ -1,7 +1,9 @@
 using backend.Data;
 using backend.DTOs.Orders;
+using backend.Hubs;
 using backend.Models;
 using backend.Services.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 
@@ -11,13 +13,16 @@ public class OrderService : IOrderService
 {
     private readonly AppDbContext _context;
     private readonly IInventoryService _inventoryService;
+    private readonly IHubContext<OrderHub> _orderHub;
 
     public OrderService(
         AppDbContext context,
-        IInventoryService inventoryService)
+        IInventoryService inventoryService,
+        IHubContext<OrderHub> orderHub)
     {
         _context = context;
         _inventoryService = inventoryService;
+        _orderHub = orderHub;
     }
 
     // =========================================================
@@ -138,13 +143,21 @@ public class OrderService : IOrderService
         _context.Orders.Add(order);
 
         table.Status = "Occupied";
+        table.OccupiedAt ??= DateTime.UtcNow;
+        table.VacatedAt = null;
         table.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        return await GetByIdAsync(order.Id)
+        var createdOrder = await GetByIdAsync(order.Id)
             ?? throw new Exception(
                 "Không thể lấy đơn hàng vừa tạo.");
+
+        await _orderHub.Clients
+            .Group(OrderHub.KitchenGroupName)
+            .SendAsync("KdsOrdersChanged");
+
+        return createdOrder;
     }
 
     // =========================================================
@@ -265,12 +278,14 @@ public class OrderService : IOrderService
             order.CompletedAt = DateTime.UtcNow;
 
             order.Table.Status = "Available";
+            order.Table.VacatedAt = DateTime.UtcNow;
             order.Table.UpdatedAt = DateTime.UtcNow;
         }
 
         if (status == "Cancelled")
         {
             order.Table.Status = "Available";
+            order.Table.VacatedAt = DateTime.UtcNow;
             order.Table.UpdatedAt = DateTime.UtcNow;
 
             foreach (var item in order.OrderItems)
