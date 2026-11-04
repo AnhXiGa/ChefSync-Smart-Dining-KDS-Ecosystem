@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HubConnectionBuilder } from "@microsoft/signalr";
 import axiosClient from "../../api/axiosClient";
 import {
@@ -56,18 +56,30 @@ function formatTime(value) {
 
 export function KitchenDashboardPage() {
   const [orders, setOrders] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalOrders, setTotalOrders] = useState(0);
   const [busyItems, setBusyItems] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("connecting");
+  const pageRef = useRef(1);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (requestedPage = pageRef.current) => {
     try {
-      const { data } = await axiosClient.get("/api/kds/orders");
-      setOrders(data);
+      const { data } = await axiosClient.get("/api/kds/orders", {
+        params: { page: requestedPage, pageSize: 6 },
+      });
+      setOrders(data.items);
+      setTotalPages(data.totalPages);
+      setTotalOrders(data.totalCount);
+      pageRef.current = data.page;
+      setPage(data.page);
       setError("");
+      return data;
     } catch (requestError) {
       setError(`Không thể tải đơn bếp: ${getErrorMessage(requestError)}`);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -100,7 +112,7 @@ export function KitchenDashboardPage() {
       if (isActive) applyUpdatedItem(updatedItem);
     };
     const handleOrdersChanged = () => {
-      if (isActive) void loadOrders();
+      if (isActive) void loadOrders(pageRef.current);
     };
 
     connection.on("OrderItemStatusChanged", handleItemStatusChanged);
@@ -206,7 +218,7 @@ export function KitchenDashboardPage() {
           }
         />
         <div className="kitchen-toolbar">
-          <StatusBadge kind="orange">{orders.length} đơn đang xử lý</StatusBadge>
+          <StatusBadge kind="orange">{totalOrders} đơn đang xử lý</StatusBadge>
           <StatusBadge kind={connectionStatus === "connected" ? "green" : "orange"}>
             {connectionLabel}
           </StatusBadge>
@@ -288,6 +300,29 @@ export function KitchenDashboardPage() {
             );
           })}
         </div>
+        {totalPages > 1 && (
+          <nav className="kitchen-pagination" aria-label="Phân trang đơn bếp">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void loadOrders(page - 1)}
+              disabled={page <= 1 || loading}
+            >
+              ← Trang trước
+            </button>
+            <span>
+              Trang {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void loadOrders(page + 1)}
+              disabled={page >= totalPages || loading}
+            >
+              Trang sau →
+            </button>
+          </nav>
+        )}
       </main>
     </BackofficeLayout>
   );

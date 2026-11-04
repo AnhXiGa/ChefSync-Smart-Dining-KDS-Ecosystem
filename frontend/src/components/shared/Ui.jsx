@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { navigationGroups } from "../../data/navigationData";
 import { canAccessPath, getStoredUser } from "../../auth/roleAccess";
+import { NotificationsBell } from "./NotificationsBell";
 
 export function StatusBadge({ children, kind = "green" }) {
   return <span className={`badge ${kind}`}>{children}</span>;
@@ -83,6 +84,8 @@ export function Sidebar({ role = "staff" }) {
 }
 
 export function Topbar({ title = "Minh Anh · Quản lý", onLogout }) {
+  const user = getStoredUser();
+
   return (
     <header className="topbar">
       <div className="breadcrumb">
@@ -90,8 +93,7 @@ export function Topbar({ title = "Minh Anh · Quản lý", onLogout }) {
       </div>
       <div className="topbar-right">
         <span>18/10/2026 · Ca trưa</span>
-        <span className="bell">♧</span>
-        <span className="notice">3 thông báo</span>
+        <NotificationsBell userId={user?.id} />
         <span className="avatar">MH</span>
         <strong>{title}</strong>
         <button className="topbar-logout" type="button" onClick={onLogout}>Đăng xuất</button>

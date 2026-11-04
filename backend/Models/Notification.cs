@@ -6,6 +6,8 @@ public class Notification
 
     public int? UserId { get; set; }
 
+    public int? TableId { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public string Message { get; set; } = string.Empty;
