@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { canAccessPath, getLandingPath, getStoredUser } from '../auth/roleAccess'
-import { CustomerOrderPage } from '../pages/customer/CustomerOrderPage'
 import CustomerMobileMenu from '../pages/customer/CustomerMobileMenu'
 import { KitchenDashboardPage } from '../pages/kitchen/KitchenDashboardPage'
 import { LoginPage } from '../pages/auth/LoginPage'
@@ -53,7 +52,6 @@ export function AppRoutes() {
 
     <Route path="/kitchen" element={<RoleRoute path="/kitchen"><KitchenDashboardPage /></RoleRoute>} />
     <Route path="/customer" element={<CustomerMobileMenu />} />
-    <Route path="/customer/:tableId" element={<CustomerOrderPage />} />
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes>
 }

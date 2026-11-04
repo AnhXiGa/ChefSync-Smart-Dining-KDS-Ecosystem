@@ -51,6 +51,8 @@ html, body, #root {
   margin: 0;
   min-height: 100%;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 *, *::before, *::after {
@@ -1408,6 +1410,7 @@ a:focus-visible {
   inset: 0;
   align-items: stretch;
   background: #f7f9f8;
+  z-index: 100;
 }
 
 .cart-panel {
@@ -1419,7 +1422,9 @@ a:focus-visible {
   border-radius: 0;
   background: #f7f9f8;
   padding: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .cart-page-statusbar,
@@ -1442,11 +1447,18 @@ a:focus-visible {
 
 .cart-page-topbar {
   height: 62px;
-  top: 30px;
+  min-height: 62px;
+  position: relative;
+  top: 0;
+  flex: 0 0 62px;
 }
 
 .cart-page-content {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 12px 16px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .cart-header {
@@ -1479,10 +1491,26 @@ a:focus-visible {
 
 .submitted-page-shell {
   padding-top: 0;
+  height: 100svh;
+  overflow: hidden;
 }
 
 .submitted-page-frame {
+  display: flex;
+  flex-direction: column;
+}
+
+.submitted-page-topbar {
+  position: relative;
+  top: 0;
+  flex: 0 0 62px;
+  z-index: 20;
+}
+
+.submitted-page-frame {
+  height: 100svh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: #f7f9f8;
 }
 
@@ -1495,11 +1523,16 @@ a:focus-visible {
   position: absolute;
   left: 16px;
   top: 12px;
+  z-index: 2;
   width: 30px;
   height: 30px;
   border: 0;
-  background: transparent;
-  color: transparent;
+  border-radius: 50%;
+  background: #edf5f1;
+  color: #28775e;
+  font-size: 28px;
+  line-height: 20px;
+  cursor: pointer;
 }
 
 .submitted-kitchen-card,
@@ -1514,6 +1547,10 @@ a:focus-visible {
 .submitted-kitchen-card {
   padding: 13px 14px 12px;
   text-align: center;
+}
+
+.submitted-kitchen-card {
+  margin-top: 42px;
 }
 
 .submitted-kitchen-label {
@@ -1689,9 +1726,16 @@ a:focus-visible {
 
 .submitted-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 10px;
+}
+
+.counter-payment-note {
+  margin: 14px 0 0;
+  text-align: center;
+  color: #66766f;
+  font-size: 13px;
 }
 
 .submitted-actions button {
@@ -1769,6 +1813,17 @@ a:focus-visible {
 .cart-add-more-button {
   width: 100%;
   min-height: 46px;
+  border: 1px solid #28775e;
+  border-radius: 7px;
+  background: #fff;
+  color: #28775e;
+  font-weight: 700;
+}
+
+.cart-call-staff-button {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
   border: 1px solid #28775e;
   border-radius: 7px;
   background: #fff;
