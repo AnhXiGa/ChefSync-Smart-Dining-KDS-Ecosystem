@@ -122,8 +122,10 @@ public sealed class SuppliersController(AppDbContext context) : ApiScaffoldContr
         var name = request.Name?.Trim();
         if (string.IsNullOrWhiteSpace(name) || name.Length > 150)
             return "Tên nhà cung cấp là bắt buộc và không vượt quá 150 ký tự.";
-        if (request.Phone?.Trim().Length > 20)
-            return "Số điện thoại không vượt quá 20 ký tự.";
+        var phone = request.Phone?.Trim();
+        if (!string.IsNullOrEmpty(phone)
+            && (phone.Length != 10 || phone.Any(character => character is < '0' or > '9')))
+            return "Số điện thoại phải gồm đúng 10 chữ số.";
         if (request.Email?.Trim().Length > 150)
             return "Email không vượt quá 150 ký tự.";
         if (!string.IsNullOrWhiteSpace(request.Email)

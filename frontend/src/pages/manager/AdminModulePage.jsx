@@ -14,6 +14,42 @@ function getError(error, fallback) {
   return error.response?.data?.message ?? fallback;
 }
 
+function parseCurrencyInput(value) {
+  const cleaned = value.replace(/\./g, "").replace(/[^\d,]/g, "");
+  const [integerPart, ...fractionParts] = cleaned.split(",");
+  const integer = integerPart.replace(/\D/g, "");
+  if (!integer && !cleaned.includes(",")) return "";
+  const fraction = fractionParts.join("").replace(/\D/g, "").slice(0, 2);
+  return cleaned.includes(",") ? `${integer || "0"}.${fraction}` : integer;
+}
+
+function formatCurrencyInput(value) {
+  if (!value) return "";
+  const [integerPart, fraction] = value.split(".");
+  const formattedInteger = Number(integerPart || 0).toLocaleString("vi-VN");
+  return value.includes(".") ? `${formattedInteger},${fraction}` : formattedInteger;
+}
+
+function getCurrencyInputCursor(value, cursor) {
+  const prefix = value.slice(0, cursor);
+  const integerDigits = (prefix.split(",")[0].match(/\d/g) ?? []).length;
+  const fractionDigits = prefix.includes(",")
+    ? (prefix.split(",")[1].match(/\d/g) ?? []).length
+    : 0;
+  const formatted = formatCurrencyInput(parseCurrencyInput(value));
+  if (prefix.includes(",") && formatted.includes(",")) {
+    return formatted.indexOf(",") + 1 + fractionDigits;
+  }
+
+  let position = 0;
+  let digits = 0;
+  while (position < formatted.length && digits < integerDigits) {
+    if (/\d/.test(formatted[position])) digits += 1;
+    position += 1;
+  }
+  return position;
+}
+
 const movementOptions = [
   { value: "Receipt", label: "Nhập hàng", direction: 1 },
   { value: "Waste", label: "Hao hụt", direction: -1 },
@@ -55,6 +91,7 @@ function InventoryMovementsModule({ config }) {
   const [transactions, setTransactions] = useState([]);
   const [query, setQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({
     type: "Waste",
     ingredientId: "",
@@ -116,6 +153,13 @@ function InventoryMovementsModule({ config }) {
       return matchesType && matchesQuery;
     });
   }, [filterType, query, transactions]);
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   const submitMovement = async (event) => {
     event.preventDefault();
@@ -149,6 +193,7 @@ function InventoryMovementsModule({ config }) {
       );
       setForm((current) => ({ ...current, quantity: "", note: "" }));
       setNotice("Đã ghi nhận biến động kho.");
+      setPage(1);
       await load();
     } catch (requestError) {
       setError(getError(requestError, "Không thể ghi nhận biến động kho."));
@@ -206,13 +251,19 @@ function InventoryMovementsModule({ config }) {
       <section className="inventory-movement-toolbar">
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(1);
+          }}
           placeholder="Tìm nguyên liệu hoặc tham chiếu..."
           aria-label="Tìm nguyên liệu hoặc tham chiếu"
         />
         <select
           value={filterType}
-          onChange={(event) => setFilterType(event.target.value)}
+          onChange={(event) => {
+            setFilterType(event.target.value);
+            setPage(1);
+          }}
           aria-label="Lọc loại biến động"
         >
           <option value="all">Tất cả loại biến động</option>
@@ -255,7 +306,7 @@ function InventoryMovementsModule({ config }) {
                     </td>
                   </tr>
                 )}
-                {filteredTransactions.map((transaction) => {
+                {paginatedTransactions.map((transaction) => {
                   const type = getMovementType(transaction);
                   const reference = transaction.referenceId
                     ? `${transaction.referenceType ?? "Tham chiếu"} #${transaction.referenceId}`
@@ -283,6 +334,33 @@ function InventoryMovementsModule({ config }) {
               </tbody>
             </table>
           </div>
+          {filteredTransactions.length > 0 && (
+            <div className="inventory-movement-pagination" aria-label="Phân trang biến động kho">
+              <span>
+                Hiển thị {(currentPage - 1) * pageSize + 1}-
+                {Math.min(currentPage * pageSize, filteredTransactions.length)} / {filteredTransactions.length}
+              </span>
+              <div>
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Trước
+                </button>
+                <strong>Trang {currentPage} / {pageCount}</strong>
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                  disabled={currentPage === pageCount}
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className="data-card inventory-movement-form-card">
@@ -454,6 +532,7 @@ function MenuManagementModule({ config }) {
   const [categories, setCategories] = useState([]);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
@@ -481,6 +560,14 @@ function MenuManagementModule({ config }) {
     }
   }, [categoryId, query]);
 
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(products.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedProducts = products.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
   useEffect(() => {
     const timer = window.setTimeout(() => void loadMenu(), 250);
     return () => window.clearTimeout(timer);
@@ -507,6 +594,7 @@ function MenuManagementModule({ config }) {
       if (editing === "new") await axiosClient.post("/api/products", payload);
       else await axiosClient.put(`/api/products/${editing}`, payload);
       setEditing(null);
+      setPage(1);
       await loadMenu();
     } catch (requestError) {
       setError(getError(requestError, "Không thể lưu món ăn."));
@@ -532,8 +620,8 @@ function MenuManagementModule({ config }) {
     <>
       <PageTitle title={config.title} description={config.description} action={<button className="primary" type="button" onClick={startCreate} disabled={categories.length === 0}>+ Thêm món ăn</button>} />
       <div className="module-toolbar menu-toolbar">
-        <div className="search"><input placeholder="Tìm tên món ăn..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-        <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} aria-label="Lọc theo danh mục">
+        <div className="search"><input placeholder="Tìm tên món ăn..." value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></div>
+        <select value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setPage(1); }} aria-label="Lọc theo danh mục">
           <option value="ALL">Tất cả danh mục</option>
           {categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
         </select>
@@ -548,7 +636,7 @@ function MenuManagementModule({ config }) {
         <div className="data-table menu-data-table">
           <div className="data-row data-header"><span>Món ăn</span><span>Danh mục</span><span>Giá bán</span><span>Thời gian</span><span>Trạng thái</span><span>Thao tác</span></div>
           {!loading && products.length === 0 && <div className="menu-empty">Không tìm thấy món ăn phù hợp.</div>}
-          {products.map((product) => (
+          {paginatedProducts.map((product) => (
             <div className="data-row" key={product.id}>
               <span className="menu-product-cell">
                 {product.imageUrl ? <img src={product.imageUrl} alt="" className="menu-product-image" /> : <span className="menu-product-placeholder" aria-hidden="true">🍽</span>}
@@ -567,6 +655,33 @@ function MenuManagementModule({ config }) {
             </div>
           ))}
         </div>
+        {products.length > 0 && (
+          <div className="inventory-pagination" aria-label="Phân trang món ăn">
+            <span>
+              Hiển thị {(currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, products.length)} / {products.length}
+            </span>
+            <div>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+              >
+                Trước
+              </button>
+              <strong>Trang {currentPage} / {pageCount}</strong>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                disabled={currentPage === pageCount}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       {editing !== null && (
         <section className="data-card category-form-card product-form-card">
@@ -696,6 +811,7 @@ function InventoryModule({ module, config }) {
   const [bom, setBom] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -744,11 +860,20 @@ function InventoryModule({ module, config }) {
   }, [load]);
 
   const filteredIngredients = useMemo(
-    () =>
-      ingredients.filter((ingredient) =>
-        ingredient.name.toLowerCase().includes(query.toLowerCase()),
-      ),
+    () => {
+      const term = query.trim().toLocaleLowerCase("vi");
+      return ingredients.filter((ingredient) =>
+        `${ingredient.name} ${ingredient.unit}`.toLocaleLowerCase("vi").includes(term),
+      );
+    },
     [ingredients, query],
+  );
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(filteredIngredients.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedIngredients = filteredIngredients.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   );
 
   const submitIngredient = async (event) => {
@@ -823,7 +948,7 @@ function InventoryModule({ module, config }) {
               <option value="">Chọn nguyên liệu</option>
               {ingredients.map((ingredient) => <option value={ingredient.id} key={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}
             </select>
-            <input required type="number" min="0.000001" step="0.001" placeholder="Số lượng / phần" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
+            <input required type="number" min="0.001" step="0.001" placeholder="Số lượng / phần" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
             <button className="primary" type="submit" disabled={!selectedProduct}>Thêm nguyên liệu</button>
           </form>
           <div className="data-table">
@@ -839,16 +964,67 @@ function InventoryModule({ module, config }) {
     <>
       <PageTitle title={config.title} description={config.description} />
       {error && <p className="login-error" role="alert">{error}</p>}
-      <div className="module-toolbar">
-        <div className="search">⌕ <input placeholder="Tìm kiếm..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+      <div className="users-toolbar inventory-toolbar">
+        <label className="users-search inventory-search">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></svg>
+          <input
+            type="search"
+            placeholder="Tìm theo tên hoặc đơn vị nguyên liệu..."
+            aria-label="Tìm nguyên liệu theo tên hoặc đơn vị"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
+          />
+          {query && <button type="button" onClick={() => { setQuery(""); setPage(1); }} aria-label="Xóa nội dung tìm kiếm">×</button>}
+        </label>
+        <span className="users-result-count">{filteredIngredients.length} / {ingredients.length} nguyên liệu</span>
         <button className="secondary" type="button" onClick={load}>Làm mới</button>
       </div>
       <section className="data-card">
-        <div className="data-card-head"><div><strong>{filteredIngredients.length} bản ghi</strong><p>Dữ liệu tồn kho hiện tại</p></div><StatusBadge>Đang đồng bộ</StatusBadge></div>
+        <div className="data-card-head"><div><strong>{filteredIngredients.length} nguyên liệu</strong><p>Dữ liệu tồn kho hiện tại</p></div><StatusBadge>Đang đồng bộ</StatusBadge></div>
         <div className="data-table">
           <div className="data-row data-header"><span>Nguyên vật liệu</span><span>Đơn vị</span><span>Tồn hiện tại</span><span>Tồn tối thiểu</span><span>Trạng thái</span><span /></div>
-          {filteredIngredients.map((item) => <div className="data-row" key={item.id}><span>{item.name}</span><span>{item.unit}</span><span>{item.currentStock}</span><span>{item.minimumStock}</span><span><StatusBadge kind={item.isLowStock ? "orange" : "green"}>{item.isLowStock ? "Sắp hết" : "Đủ hàng"}</StatusBadge></span><span /></div>)}
+          {paginatedIngredients.map((item) => {
+            const isOutOfStock = Number(item.currentStock) <= 0;
+            const isLowStock = Boolean(item.isLowStock);
+            return (
+              <div className="data-row" key={item.id}>
+                <span>{item.name}</span><span>{item.unit}</span><span>{item.currentStock}</span><span>{item.minimumStock}</span>
+                <span><StatusBadge kind={isOutOfStock ? "red" : isLowStock ? "orange" : "green"}>{isOutOfStock ? "Hết hàng" : isLowStock ? "Sắp hết" : "Đủ hàng"}</StatusBadge></span><span />
+              </div>
+            );
+          })}
+          {filteredIngredients.length === 0 && <div className="users-empty">Không tìm thấy nguyên liệu phù hợp.</div>}
         </div>
+        {filteredIngredients.length > 0 && (
+          <div className="inventory-pagination" aria-label="Phân trang nguyên vật liệu">
+            <span>
+              Hiển thị {(currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, filteredIngredients.length)} / {filteredIngredients.length}
+            </span>
+            <div>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+              >
+                Trước
+              </button>
+              <strong>Trang {currentPage} / {pageCount}</strong>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                disabled={currentPage === pageCount}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       <section className="data-card inventory-create-card">
         <div className="data-card-head"><div><strong>Thêm nguyên vật liệu</strong><p>Lưu trực tiếp vào kho</p></div></div>
@@ -866,6 +1042,7 @@ function InventoryModule({ module, config }) {
 
 function SuppliersModule({ config }) {
   const [suppliers, setSuppliers] = useState([]);
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "" });
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
@@ -886,8 +1063,21 @@ function SuppliersModule({ config }) {
     void load();
   }, [load]);
 
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(suppliers.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedSuppliers = suppliers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
   const submit = async (event) => {
     event.preventDefault();
+    const phone = form.phone.trim();
+    if (phone && !/^\d{10}$/.test(phone)) {
+      setError("Số điện thoại phải gồm đúng 10 chữ số.");
+      return;
+    }
     try {
       if (editingId) {
         await axiosClient.put(`/api/suppliers/${editingId}`, form);
@@ -896,6 +1086,7 @@ function SuppliersModule({ config }) {
       }
       setForm({ name: "", phone: "", email: "", address: "" });
       setEditingId(null);
+      setPage(1);
       await load();
     } catch (requestError) {
       setError(getError(requestError, "Không thể lưu nhà cung cấp."));
@@ -931,7 +1122,7 @@ function SuppliersModule({ config }) {
         <div className="data-card-head"><div><strong>{suppliers.length} nhà cung cấp</strong><p>Danh bạ được lưu trong database</p></div><button className="secondary" type="button" onClick={load}>Làm mới</button></div>
         <div className="data-table supplier-table">
           <div className="data-row data-header"><span>Nhà cung cấp</span><span>Liên hệ</span><span>Địa chỉ</span><span>Số phiếu</span><span>Trạng thái</span><span /></div>
-          {suppliers.map((supplier) => (
+          {paginatedSuppliers.map((supplier) => (
             <div className="data-row" key={supplier.id}>
               <span><strong>{supplier.name}</strong></span>
               <span>{supplier.phone || "—"}<small>{supplier.email || ""}</small></span>
@@ -946,12 +1137,39 @@ function SuppliersModule({ config }) {
           ))}
           {suppliers.length === 0 && <div className="users-empty">Chưa có nhà cung cấp.</div>}
         </div>
+        {suppliers.length > 0 && (
+          <div className="inventory-pagination" aria-label="Phân trang nhà cung cấp">
+            <span>
+              Hiển thị {(currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, suppliers.length)} / {suppliers.length}
+            </span>
+            <div>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+              >
+                Trước
+              </button>
+              <strong>Trang {currentPage} / {pageCount}</strong>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                disabled={currentPage === pageCount}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       <section className="data-card users-form-card">
         <div className="data-card-head"><div><strong>{editingId ? "Cập nhật nhà cung cấp" : "Thêm nhà cung cấp"}</strong><p>Thông tin liên hệ và địa chỉ</p></div></div>
         <form className="supplier-form" onSubmit={submit}>
           <input required maxLength={150} placeholder="Tên nhà cung cấp" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-          <input maxLength={20} placeholder="Số điện thoại" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+          <input type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} title="Số điện thoại phải gồm đúng 10 chữ số" placeholder="Số điện thoại" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
           <input type="email" maxLength={150} placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
           <input maxLength={300} placeholder="Địa chỉ" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} />
           <button className="primary" type="submit">{editingId ? "Lưu thay đổi" : "Thêm nhà cung cấp"}</button>
@@ -964,6 +1182,7 @@ function SuppliersModule({ config }) {
 
 function PurchaseOrdersModule({ config }) {
   const [orders, setOrders] = useState([]);
+  const [page, setPage] = useState(1);
   const [suppliers, setSuppliers] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [error, setError] = useState("");
@@ -992,6 +1211,14 @@ function PurchaseOrdersModule({ config }) {
     // oxlint-disable-next-line react/set-state-in-effect
     void load();
   }, [load]);
+
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(orders.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedOrders = orders.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   const updateItem = (index, key, value) => {
     setItems((current) => current.map((item, itemIndex) =>
@@ -1026,6 +1253,7 @@ function PurchaseOrdersModule({ config }) {
       });
       setForm({ supplierId: "", note: "" });
       setItems([{ ingredientId: "", quantity: "", unitPrice: "" }]);
+      setPage(1);
       await load();
     } catch (requestError) {
       setError(getError(requestError, "Không thể tạo phiếu nhập hàng."));
@@ -1092,7 +1320,7 @@ function PurchaseOrdersModule({ config }) {
         <div className="data-card-head"><div><strong>{orders.length} phiếu nhập</strong><p>Kho chỉ được cộng khi xác nhận nhận hàng</p></div><button className="secondary" type="button" onClick={load}>Làm mới</button></div>
         <div className="data-table purchase-order-table">
           <div className="data-row data-header"><span>Mã phiếu / Nhà cung cấp</span><span>Nguyên liệu</span><span>Ngày tạo</span><span>Tổng tiền</span><span>Trạng thái</span><span>Thao tác</span></div>
-          {orders.map((order) => (
+          {paginatedOrders.map((order) => (
             <div className="data-row" key={order.id}>
               <span><strong>{order.purchaseCode}</strong><small>{order.supplierName}</small></span>
               <span>{order.items.map((item) => `${item.ingredientName}: ${item.quantity} ${item.unit}`).join(", ")}</span>
@@ -1107,6 +1335,33 @@ function PurchaseOrdersModule({ config }) {
           ))}
           {orders.length === 0 && <div className="users-empty">Chưa có phiếu nhập hàng.</div>}
         </div>
+        {orders.length > 0 && (
+          <div className="inventory-pagination" aria-label="Phân trang phiếu nhập hàng">
+            <span>
+              Hiển thị {(currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, orders.length)} / {orders.length}
+            </span>
+            <div>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+              >
+                Trước
+              </button>
+              <strong>Trang {currentPage} / {pageCount}</strong>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                disabled={currentPage === pageCount}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       <section className="data-card users-form-card">
         <div className="data-card-head"><div><strong>Tạo phiếu nhập hàng</strong><p>Xác nhận “Nhận hàng” sẽ cộng số lượng vào kho một lần</p></div></div>
@@ -1123,7 +1378,23 @@ function PurchaseOrdersModule({ config }) {
                 {ingredients.filter((ingredient) => ingredient.isActive).map((ingredient) => <option value={ingredient.id} key={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}
               </select>
               <input required type="number" min="0.001" step="0.001" placeholder="Số lượng" value={item.quantity} onChange={(event) => updateItem(index, "quantity", event.target.value)} />
-              <input required type="number" min="0" step="0.01" placeholder="Đơn giá" value={item.unitPrice} onChange={(event) => updateItem(index, "unitPrice", event.target.value)} />
+              <label className="purchase-order-price">
+                <input
+                  required
+                  type="text"
+                  inputMode="decimal"
+                  aria-label="Đơn giá (đồng)"
+                  placeholder="Đơn giá"
+                  value={formatCurrencyInput(item.unitPrice)}
+                  onChange={(event) => {
+                    const input = event.currentTarget;
+                    const cursor = getCurrencyInputCursor(input.value, input.selectionStart ?? input.value.length);
+                    updateItem(index, "unitPrice", parseCurrencyInput(input.value));
+                    requestAnimationFrame(() => input.setSelectionRange(cursor, cursor));
+                  }}
+                />
+                <span>đ</span>
+              </label>
               {items.length > 1 && <button className="secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Xóa dòng</button>}
             </div>
           ))}
@@ -1171,12 +1442,14 @@ function UsersModule({ config }) {
   }, [load]);
 
   const filteredUsers = useMemo(
-    () =>
-      users.filter((user) =>
-        `${user.fullName} ${user.email} ${user.employeeCode} ${(user.roles ?? []).join(" ")}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
+    () => {
+      const term = query.trim().toLocaleLowerCase("vi");
+      return users.filter((user) =>
+        `${user.fullName} ${user.email} ${user.employeeCode} ${user.position ?? ""} ${(user.roles ?? []).join(" ")} ${user.isActive ? "Hoạt động" : "Đã khóa"}`
+          .toLocaleLowerCase("vi")
+          .includes(term),
+      );
+    },
     [users, query],
   );
 
@@ -1243,8 +1516,19 @@ function UsersModule({ config }) {
     <>
       <PageTitle title={config.title} description={config.description} />
       {error && <p className="login-error" role="alert">{error}</p>}
-      <div className="module-toolbar">
-        <div className="search">⌕ <input placeholder="Tìm tài khoản..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+      <div className="users-toolbar">
+        <label className="users-search">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></svg>
+          <input
+            type="search"
+            placeholder="Tìm theo tên, email, mã nhân viên hoặc quyền..."
+            aria-label="Tìm người dùng theo tên, email, mã nhân viên, chức vụ hoặc quyền"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {query && <button type="button" onClick={() => setQuery("")} aria-label="Xóa nội dung tìm kiếm">×</button>}
+        </label>
+        <span className="users-result-count">{filteredUsers.length} / {users.length} người dùng</span>
         <button className="secondary" type="button" onClick={load}>Làm mới</button>
       </div>
       <section className="data-card">

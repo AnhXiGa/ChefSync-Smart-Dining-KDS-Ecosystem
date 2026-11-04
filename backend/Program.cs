@@ -86,6 +86,8 @@ using (var scope = app.Services.CreateScope())
     await AccountSeeder.SeedManagerAsync(scope.ServiceProvider);
     await SmartPosSeeder.SeedAsync(context);
     await SmartPosSeeder.SeedPurchaseOrdersAsync(context);
+    await SmartPosSeeder.SeedInventoryTransactionsAsync(context);
+    await SmartPosSeeder.SeedFinancialReportDataAsync(context);
 }
 
 // =====================================================

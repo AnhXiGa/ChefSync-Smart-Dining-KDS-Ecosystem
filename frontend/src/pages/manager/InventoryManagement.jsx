@@ -152,7 +152,11 @@ export default function InventoryManagement() {
       <section className="panel inventory-section">
         <div className="section-heading"><div><span className="panel-kicker">TỔNG QUAN</span><h2>Tồn kho hiện tại</h2></div><span className="section-count">{ingredients.length} nguyên liệu</span></div>
         <div className="table-wrap"><table className="data-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn kho</th><th>Ngưỡng</th><th>Trạng thái</th></tr></thead>
-          <tbody>{ingredients.length === 0 ? <tr><td className="empty-state" colSpan="5">Chưa có nguyên liệu. Hãy thêm nguyên liệu mới.</td></tr> : ingredients.map((ingredient) => <tr key={ingredient.id}><td className="name-cell">{ingredient.name}</td><td>{ingredient.unit}</td><td className="number-cell">{ingredient.currentStock}</td><td className="number-cell">{ingredient.minimumStock}</td><td><span className={ingredient.isLowStock ? "badge warning" : "badge"}>{ingredient.isLowStock ? "Sắp hết" : "Đủ hàng"}</span></td></tr>)}</tbody>
+          <tbody>{ingredients.length === 0 ? <tr><td className="empty-state" colSpan="5">Chưa có nguyên liệu. Hãy thêm nguyên liệu mới.</td></tr> : ingredients.map((ingredient) => {
+            const isOutOfStock = ingredient.currentStock <= 0;
+            const status = isOutOfStock ? "Hết hàng" : ingredient.isLowStock ? "Sắp hết" : "Đủ hàng";
+            return <tr key={ingredient.id}><td className="name-cell">{ingredient.name}</td><td>{ingredient.unit}</td><td className="number-cell">{ingredient.currentStock}</td><td className="number-cell">{ingredient.minimumStock}</td><td><span className={`badge ${isOutOfStock ? "red" : ingredient.isLowStock ? "warning" : ""}`}>{status}</span></td></tr>;
+          })}</tbody>
         </table></div>
       </section>
 
@@ -169,7 +173,7 @@ export default function InventoryManagement() {
         </div>
         <form className="bom-toolbar" onSubmit={addBomItem}>
           <label>Nguyên liệu<select required value={bomForm.ingredientId} onChange={(e) => setBomForm({ ...bomForm, ingredientId: e.target.value })}><option value="">Chọn nguyên liệu</option>{ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}</select></label>
-          <label>Số lượng / phần<input required type="number"  value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} /></label>
+          <label>Số lượng / phần<input required type="number" min="0.001" step="0.001" value={bomForm.quantity} onChange={(e) => setBomForm({ ...bomForm, quantity: e.target.value })} /></label>
           <button type="submit">Thêm vào BOM</button>
         </form>
         <div className="table-wrap"><table className="data-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị kho</th><th>Định lượng / phần</th></tr></thead><tbody>{bom.length === 0 ? <tr><td className="empty-state" colSpan="3">Chưa có định lượng cho món này.</td></tr> : bom.map((item) => <tr key={item.ingredientId}><td className="name-cell">{item.ingredientName}</td><td><span className="unit-pill">{item.unit}</span></td><td className="number-cell">{item.quantity}</td></tr>)}</tbody></table></div>

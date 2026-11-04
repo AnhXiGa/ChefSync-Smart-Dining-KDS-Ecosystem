@@ -138,6 +138,40 @@
   text-align: center;
 }
 
+.admin-module-page .inventory-movement-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  color: #87918c;
+  font-size: 11px;
+}
+
+.admin-module-page .inventory-movement-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-module-page .inventory-movement-pagination button {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.admin-module-page .inventory-movement-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.admin-module-page .inventory-movement-pagination strong {
+  color: #52635b;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .admin-module-page .inventory-movement-form-card {
   padding-bottom: 20px;
 }
@@ -230,5 +264,15 @@
 
   .admin-module-page .inventory-movement-actions button {
     flex: 1;
+  }
+
+  .admin-module-page .inventory-movement-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-module-page .inventory-movement-pagination > div {
+    width: 100%;
+    justify-content: space-between;
   }
 }
