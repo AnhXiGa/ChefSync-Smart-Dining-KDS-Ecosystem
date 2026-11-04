@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { HubConnectionBuilder } from '@microsoft/signalr';
-import { createPayment } from '../../api/paymentApi';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5266').replace(/\/+$/, '');
 const apiUrl = typeof window !== 'undefined' &&
@@ -19,6 +17,12 @@ const formatCurrency = (value) =>
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value || 0);
+
+const formatTableName = (tableNumber) => {
+  const value = String(tableNumber || '').trim();
+  if (!value) return '';
+  return /^bàn\s/i.test(value) ? value : `Bàn ${value}`;
+};
 
 const orderItemStatusLabels = {
   Pending: 'Chờ bếp nhận',
@@ -57,11 +61,6 @@ function CustomerMobileMenu() {
   const [notificationError, setNotificationError] = useState('');
   const [orderUpdatesError, setOrderUpdatesError] = useState('');
   const [cancelingItemId, setCancelingItemId] = useState(null);
-  const [payment, setPayment] = useState(null);
-  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
-  const [paymentError, setPaymentError] = useState('');
-  const [isPaymentPage, setIsPaymentPage] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('QR');
   const [isSubmittedPage, setIsSubmittedPage] = useState(false);
   const [staffCallType, setStaffCallType] = useState('');
   const [staffCallError, setStaffCallError] = useState('');
@@ -138,161 +137,23 @@ function CustomerMobileMenu() {
   }, [qrToken]);
 
   useEffect(() => {
-    if (!tableInfo?.tableId || !qrToken) return undefined;
-
-    let isActive = true;
-    const connection = new HubConnectionBuilder()
-      .withUrl(`${apiUrl}/hubs/notifications`)
-      .withAutomaticReconnect()
-      .build();
-    notificationHubConnection.current = connection;
-
-    const handleNotificationsChanged = () => {
-      if (isActive) {
-        void loadNotifications().catch((requestError) => {
-          if (isActive) {
-            setNotificationError(
-              requestError.response?.data?.message || requestError.message,
-            );
-          }
-        });
-      }
-    };
-
-    connection.on('NotificationsChanged', handleNotificationsChanged);
-    connection.onreconnecting(() => {
-      if (isActive) setNotificationError('Đang kết nối lại thông báo...');
-    });
-    connection.onreconnected(async () => {
-      try {
-        await connection.invoke('JoinCustomerNotifications', qrToken);
-        await loadNotifications();
-      } catch (connectionError) {
-        if (isActive) setNotificationError(connectionError.message);
-      }
-    });
-    connection.onclose((connectionError) => {
-      if (isActive && connectionError) {
-        setNotificationError(`Mất kết nối thông báo: ${connectionError.message}`);
-      }
-    });
-
-    const connect = async () => {
-      try {
-        await connection.start();
-        if (!isActive) return;
-        await connection.invoke('JoinCustomerNotifications', qrToken);
-        await loadNotifications();
-      } catch (connectionError) {
-        if (isActive) {
-          setNotificationError(`Không thể kết nối thông báo: ${connectionError.message}`);
-        }
-      }
-    };
-    void connect();
-
-    return () => {
-      isActive = false;
-      if (notificationHubConnection.current === connection) {
-        notificationHubConnection.current = null;
-      }
-      connection.off('NotificationsChanged', handleNotificationsChanged);
-      connection.stop().catch((connectionError) => {
-        console.error('Could not stop the customer notifications connection.', connectionError);
-      });
-    };
-  }, [loadNotifications, qrToken, tableInfo?.tableId]);
+    if (!isSubmittedPage) return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.querySelector('.submitted-page-frame')?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [isSubmittedPage]);
 
   useEffect(() => {
-    if (!tableInfo?.tableId || !qrToken) return undefined;
+    if (!isCartOpen) return;
+    document.querySelector('.cart-panel')?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [isCartOpen]);
 
-    let isActive = true;
-    const connection = new HubConnectionBuilder()
-      .withUrl(`${apiUrl}/hubs/orders`)
-      .withAutomaticReconnect()
-      .build();
-
-    orderHubConnection.current = connection;
-
-    const joinOrders = async (orders) => {
-      await Promise.all(
-        orders.map((order) => connection.invoke('JoinOrder', order.id)),
-      );
-    };
-
-    const handleItemStatusChanged = (updatedItem) => {
-      if (!isActive) return;
-
-      setPlacedOrders((orders) =>
-        orders.map((order) =>
-          order.id === updatedItem.orderId
-            ? {
-                ...order,
-                items: order.items.map((item) =>
-                  item.id === updatedItem.id
-                    ? {
-                        ...item,
-                        status: updatedItem.status,
-                        canCancel: ['Pending', 'Accepted'].includes(updatedItem.status),
-                      }
-                    : item,
-                ),
-              }
-            : order,
-        ),
-      );
-    };
-
-    connection.on('OrderItemStatusChanged', handleItemStatusChanged);
-    connection.onreconnecting(() => {
-      if (isActive) setOrderUpdatesError('Đang kết nối lại để đồng bộ trạng thái món.');
-    });
-    connection.onreconnected(async () => {
-      try {
-        const latestOrders = await loadCustomerOrders();
-        if (!isActive) return;
-        await joinOrders(latestOrders);
-        setOrderUpdatesError('');
-      } catch (connectionError) {
-        if (!isActive) return;
-        setOrderUpdatesError(`Không thể đồng bộ trạng thái món: ${connectionError.message}`);
-      }
-    });
-    connection.onclose((connectionError) => {
-      if (!isActive) return;
-      if (connectionError) {
-        setOrderUpdatesError(`Mất kết nối cập nhật trạng thái món: ${connectionError.message}`);
-      }
-    });
-
-    const connect = async () => {
-      try {
-        await connection.start();
-        if (!isActive) return;
-        const latestOrders = await loadCustomerOrders();
-        if (!isActive) return;
-        await joinOrders(latestOrders);
-        setOrderUpdatesError('');
-      } catch (connectionError) {
-        if (isActive) {
-          setOrderUpdatesError(`Không thể kết nối cập nhật trạng thái món: ${connectionError.message}`);
-        }
-      }
-    };
-
-    void connect();
-
+  useEffect(() => {
+    const overlayOpen = isCartOpen || isSubmittedPage;
+    document.body.style.overflow = overlayOpen ? 'hidden' : '';
     return () => {
-      isActive = false;
-      if (orderHubConnection.current === connection) {
-        orderHubConnection.current = null;
-      }
-      connection.off('OrderItemStatusChanged', handleItemStatusChanged);
-      connection.stop().catch((connectionError) => {
-        console.error('Could not stop the customer order hub connection.', connectionError);
-      });
+      document.body.style.overflow = '';
     };
-  }, [loadCustomerOrders, qrToken, tableInfo?.tableId]);
+  }, [isCartOpen, isSubmittedPage]);
 
   const filteredCategories = useMemo(() => {
     return categories
@@ -352,16 +213,6 @@ function CustomerMobileMenu() {
     );
   };
 
-  const servedItemCount = placedOrders.reduce(
-    (sum, order) => sum + order.items.filter((item) => item.status === 'Served').length,
-    0,
-  );
-  const canProceedToPayment =
-    placedOrders.length > 0 &&
-    servedItemCount > 0 &&
-    placedOrders.every((order) =>
-      order.items.every((item) => item.status === 'Served' || item.status === 'Cancelled'),
-    );
   const invoiceItems = placedOrders.flatMap((order) =>
     order.items
       .filter((item) => item.status !== 'Cancelled')
@@ -374,7 +225,6 @@ function CustomerMobileMenu() {
     (sum, item) => sum + (item.subtotal || item.unitPrice * item.quantity || 0),
     0,
   );
-  const invoiceTax = Math.round(invoiceSubtotal * 0.08);
   const draftTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const draftTotalPrice = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const totalItems = draftTotalItems + invoiceItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -415,39 +265,6 @@ function CustomerMobileMenu() {
       alert(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đơn gọi món.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleProceedToPayment = async () => {
-    if (placedOrders.length === 0) {
-      setPaymentError('Vui lòng gửi đơn đặt món trước khi thanh toán.');
-      setPayment({});
-      return;
-    }
-    if (!canProceedToPayment) {
-      setPaymentError('Khách hàng chỉ được thanh toán sau khi đã nhận đủ tất cả món.');
-      setPayment({});
-      return;
-    }
-
-    const latestOrder = placedOrders[0];
-    setIsPaymentLoading(true);
-    setPaymentError('');
-    setPayment(null);
-
-    try {
-      const createdPayment = await createPayment({
-        orderId: latestOrder.id,
-        paymentMethod: 'BankTransfer',
-      });
-      setPayment(createdPayment);
-      setIsPaymentPage(true);
-      setIsCartOpen(false);
-    } catch (err) {
-      setPaymentError(err.response?.data?.message || 'Không thể tạo mã thanh toán.');
-      setPayment({});
-    } finally {
-      setIsPaymentLoading(false);
     }
   };
 
@@ -569,17 +386,11 @@ function CustomerMobileMenu() {
     return (
       <div className="mobile-shell submitted-page-shell">
         <div className="phone-frame submitted-page-frame">
-          <div className="payment-page-statusbar" aria-hidden="true">
-            <span>12:30</span>
-            <div><span>▮▮</span><span>⌁</span><span>▣</span></div>
-          </div>
-
-          <header className="topbar payment-page-topbar">
+          <header className="topbar submitted-page-topbar">
             <div className="brand-lockup">
-              <span className="brand-mark"><span>♨</span></span>
               <h1>Smart POS</h1>
             </div>
-            <div className="table-badge">Bàn {tableInfo?.tableNumber}</div>
+            <div className="table-badge">{formatTableName(tableInfo?.tableNumber)}</div>
           </header>
 
           <main className="submitted-page-content">
@@ -618,8 +429,7 @@ function CustomerMobileMenu() {
 
             <section className="submitted-items-card">
               <h3>Từng món của bạn</h3>
-              {orderUpdatesError && <p role="alert">{orderUpdatesError}</p>}
-              {latestOrder.items.map((item) => (
+              {latestOrder.items.filter((item) => item.status !== 'Cancelled').map((item) => (
                 <div className="submitted-item-row" key={item.id}>
                   <strong>{item.quantity} × {item.productName}</strong>
                   <span>
@@ -642,7 +452,7 @@ function CustomerMobileMenu() {
 
             <div className="submitted-note">
               <span>ⓘ</span>
-              <p>Trong thời gian món có thể khác mức Doi dùng nếu phát sinh chậm trễ, vui lòng liên hệ nhân viên hỗ trợ.</p>
+              <p>Trong thời gian chờ món có thể phát sinh chậm trễ. Vui lòng liên hệ nhân viên hỗ trợ nếu cần.</p>
             </div>
 
             <section className="submitted-note-box">
@@ -653,9 +463,12 @@ function CustomerMobileMenu() {
             <button
               type="button"
               className="submitted-order-more-button"
-              onClick={() => setIsSubmittedPage(false)}
+              onClick={() => {
+                setIsSubmittedPage(false);
+                setIsCartOpen(true);
+              }}
             >
-              + Gọi thêm món
+              + Quay lại giỏ hàng
             </button>
 
             <div className="submitted-actions">
@@ -666,153 +479,8 @@ function CustomerMobileMenu() {
               >
                 {staffCallType === 'assistance' ? 'Đang gửi...' : 'Gọi nhân viên'}
               </button>
-              <button
-                type="button"
-                disabled={isPaymentLoading || !canProceedToPayment}
-                onClick={handleProceedToPayment}
-              >
-                Yêu cầu thanh toán
-              </button>
             </div>
-            {staffCallSuccess && <p role="status">{staffCallSuccess}</p>}
-            {staffCallError && <p className="customer-payment-error" role="alert">{staffCallError}</p>}
-          </main>
-        </div>
-      </div>
-    );
-  }
-
-  if (isPaymentPage) {
-    const displayedTotal = payment?.amount || invoiceSubtotal + invoiceTax;
-
-    return (
-      <div className="mobile-shell payment-page-shell">
-        <div className="phone-frame payment-page-frame">
-          <div className="payment-page-statusbar" aria-hidden="true">
-            <span>13:05</span>
-            <div><span>▮▮</span><span>⌁</span><span>▣</span></div>
-          </div>
-
-          <header className="topbar payment-page-topbar">
-            <div className="brand-lockup">
-              <span className="brand-mark"><span>♨</span></span>
-              <h1>Smart POS</h1>
-            </div>
-            <div className="table-badge">Bàn {tableInfo?.tableNumber}</div>
-          </header>
-
-          <main className="payment-page-content">
-            <div className="payment-page-title-row">
-              <button
-                type="button"
-                className="payment-back-button"
-                onClick={() => {
-                  setIsPaymentPage(false);
-                  setPayment(null);
-                  setPaymentError('');
-                }}
-                aria-label="Quay lại giỏ hàng"
-              >
-                ‹
-              </button>
-              <div>
-                <h2>Thanh toán tại bàn</h2>
-                <p>Bàn {String(tableInfo?.tableNumber || '').padStart(2, '0')} · {placedOrders.map((order) => order.orderCode).join(', ')}</p>
-              </div>
-            </div>
-
-            <section className="payment-invoice-card">
-              <h3>Chi tiết hóa đơn</h3>
-              {invoiceItems.map((item) => (
-                <div className="payment-invoice-item" key={item.id}>
-                  <div>
-                    <strong>{item.quantity} × {item.productName}</strong>
-                    <small>{formatCurrency(item.unitPrice)} / phần</small>
-                  </div>
-                  <b>{formatCurrency(item.subtotal || item.unitPrice * item.quantity)}</b>
-                </div>
-              ))}
-
-              <div className="payment-invoice-totals">
-                <div><span>Tạm tính</span><strong>{formatCurrency(invoiceSubtotal)}</strong></div>
-                <div><span>Giảm giá</span><strong>0 ₫</strong></div>
-                <div><span>Thuế GTGT 8%</span><strong>{formatCurrency(invoiceTax)}</strong></div>
-                <div className="payment-invoice-grand-total">
-                  <span>Tổng thanh toán</span>
-                  <strong>{formatCurrency(displayedTotal)}</strong>
-                </div>
-              </div>
-            </section>
-
-            <section className="payment-method-card">
-              <h3>Phương thức thanh toán</h3>
-              <div className="payment-method-tabs">
-                <button
-                  type="button"
-                  className={paymentMethod === 'Cash' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('Cash')}
-                >
-                  Tiền mặt
-                </button>
-                <button
-                  type="button"
-                  className={paymentMethod === 'Transfer' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('Transfer')}
-                >
-                  Chuyển khoản
-                </button>
-                <button
-                  type="button"
-                  className={paymentMethod === 'QR' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('QR')}
-                >
-                  QR
-                </button>
-              </div>
-
-              {paymentMethod !== 'Cash' ? (
-                <div className="payment-qr-section">
-                  {payment?.qrCodeUrl && (
-                    <img src={payment.qrCodeUrl} alt="QR thanh toán chuyển khoản" />
-                  )}
-                  <strong>{payment?.transferContent || 'Đang tạo nội dung thanh toán...'}</strong>
-                  <p>Mã QR thanh toán</p>
-                  {payment?.qrCodeUrl && (
-                    <small>Nếu không quét được QR, chọn chuyển khoản thủ công trong ứng dụng ngân hàng.</small>
-                  )}
-                </div>
-              ) : (
-                <div className="payment-cash-section">
-                  <p>Vui lòng gọi nhân viên để thanh toán bằng tiền mặt.</p>
-                  <button
-                    type="button"
-                    disabled={staffCallType !== ''}
-                    onClick={() => void handleCallStaff('payment')}
-                  >
-                    {staffCallType === 'payment' ? 'Đang gửi...' : 'Gọi nhân viên thanh toán'}
-                  </button>
-                </div>
-              )}
-
-              <div className="payment-warning">
-                <span>⚠</span>
-                <p>Đang chờ nhân viên xác nhận thanh toán.<br />Chỉ bấm xác nhận sau khi nhân viên hoặc hệ thống đã nhận thanh toán.</p>
-              </div>
-            </section>
-
-            {paymentError && <p className="customer-payment-error">{paymentError}</p>}
-
-            <button
-              type="button"
-              className="payment-call-staff-button"
-              disabled={staffCallType !== ''}
-              onClick={() => void handleCallStaff('payment')}
-            >
-              <span>♟</span>
-              {staffCallType === 'payment' ? 'Đang gửi...' : 'Gọi nhân viên hỗ trợ'}
-            </button>
-            {staffCallSuccess && <p role="status">{staffCallSuccess}</p>}
-            {staffCallError && <p className="customer-payment-error" role="alert">{staffCallError}</p>}
+            <p className="counter-payment-note">Khách thanh toán tại quầy sau khi dùng bữa.</p>
           </main>
         </div>
       </div>
@@ -824,13 +492,12 @@ function CustomerMobileMenu() {
       <div className="phone-frame">
         <header className="topbar">
           <div className="brand-lockup">
-            <span className="brand-mark"><span>♨</span></span>
             <div>
               <h1>Smart POS</h1>
             </div>
           </div>
           <div className="table-info">
-            <div className="table-badge">📍 {tableInfo?.tableNumber}</div>
+            <div className="table-badge">{formatTableName(tableInfo?.tableNumber)}</div>
           </div>
         </header>
 
@@ -936,16 +603,11 @@ function CustomerMobileMenu() {
         {isCartOpen && (
           <div className="cart-modal">
             <div className="cart-panel">
-              <div className="cart-page-statusbar" aria-hidden="true">
-                <span>12:30</span>
-                <div><span>▮▮</span><span>⌁</span><span>▣</span></div>
-              </div>
               <header className="topbar cart-page-topbar">
                 <div className="brand-lockup">
-                  <span className="brand-mark"><span>♨</span></span>
                   <h1>Smart POS</h1>
                 </div>
-                <div className="table-badge">Bàn {String(tableInfo?.tableNumber || '').padStart(2, '0')}</div>
+                <div className="table-badge">{formatTableName(tableInfo?.tableNumber)}</div>
               </header>
 
               <div className="cart-page-content">
@@ -961,7 +623,7 @@ function CustomerMobileMenu() {
                   <div>
                     <h3>Giỏ hàng của bạn</h3>
                     <p className="cart-table-line">
-                      Bàn {String(tableInfo?.tableNumber || '').padStart(2, '0')} · {totalItems} món
+                      {formatTableName(tableInfo?.tableNumber)} · {totalItems} món
                     </p>
                   </div>
                 </div>
@@ -1014,18 +676,8 @@ function CustomerMobileMenu() {
                     </button>
                   )}
                   {placedOrders.length > 0 && (
-                    <button
-                      type="button"
-                      className="payment-proceed-button"
-                      onClick={handleProceedToPayment}
-                      disabled={isPaymentLoading || !canProceedToPayment}
-                    >
-                      {isPaymentLoading ? 'Đang tạo mã...' : 'Tiến hành thanh toán'}
-                    </button>
-                  )}
-                  {!canProceedToPayment && placedOrders.length > 0 && (
-                    <p className="payment-readiness-note">
-                      Thanh toán sau khi đã nhận đủ tất cả món.
+                    <p className="counter-payment-note">
+                      Khách thanh toán tại quầy sau khi dùng bữa.
                     </p>
                   )}
                 </div>
@@ -1090,52 +742,22 @@ function CustomerMobileMenu() {
                       <button type="button" onClick={handlePlaceOrder} disabled={isSubmitting}>
                         {isSubmitting ? 'Đang gửi...' : (placedOrders.length > 0 ? 'Thêm món vào đơn' : 'Đặt món')}
                       </button>
-                      <button
-                        type="button"
-                        className="payment-proceed-button"
-                        onClick={handleProceedToPayment}
-                        disabled={isPaymentLoading || !canProceedToPayment}
-                      >
-                        {isPaymentLoading ? 'Đang tạo mã...' : 'Tiến hành thanh toán'}
-                      </button>
                     </div>
-                    {!canProceedToPayment && placedOrders.length > 0 && (
-                      <p className="payment-readiness-note">
-                        Thanh toán sau khi đã nhận đủ tất cả món.
-                      </p>
-                    )}
                   </div>
                 </>
               )}
+              <button
+                type="button"
+                className="cart-call-staff-button"
+                onClick={() => window.alert('Đã gửi yêu cầu đến nhân viên hỗ trợ.')}
+              >
+                Gọi nhân viên
+              </button>
             </div>
           </div>
           </div>
         )}
 
-        {paymentError && !isPaymentPage && (
-          <div className="payment-modal-overlay" role="presentation">
-            <section className="customer-payment-modal" role="dialog" aria-modal="true">
-              <div className="customer-payment-heading">
-                <div>
-                  <span>Thanh toán chuyển khoản</span>
-                  <h3>{placedOrders[0]?.orderCode || 'Đơn hàng của bạn'}</h3>
-                </div>
-                <button type="button" onClick={() => { setPayment(null); setPaymentError(''); }}>
-                  ✕
-                </button>
-              </div>
-              <p className="customer-payment-error">{paymentError}</p>
-
-              <button
-                type="button"
-                className="payment-modal-close"
-                onClick={() => { setPayment(null); setPaymentError(''); }}
-              >
-                Đóng
-              </button>
-            </section>
-          </div>
-        )}
       </div>
     </div>
   );
