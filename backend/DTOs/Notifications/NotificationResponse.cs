@@ -3,7 +3,7 @@ namespace backend.DTOs.Notifications;
 /// <summary>Represents a notification belonging to a user.</summary>
 public sealed record NotificationResponse(
     int Id,
-    int UserId,
+    int? UserId,
     string Title,
     string Message,
     string Type,
@@ -11,4 +11,5 @@ public sealed record NotificationResponse(
     int? ReferenceId,
     bool IsRead,
     DateTimeOffset? ReadAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    int? TableId);

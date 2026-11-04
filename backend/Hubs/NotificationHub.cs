@@ -33,5 +33,37 @@ public sealed class NotificationHub(AppDbContext context) : Hub
             Context.ConnectionAborted);
     }
 
+    public async Task JoinCustomerNotifications(string qrToken)
+    {
+        if (!Guid.TryParse(qrToken, out var token))
+            throw new HubException("Mã QR không hợp lệ.");
+
+        var tableId = await context.RestaurantTables
+            .Where(table => table.QrToken == token)
+            .Select(table => (int?)table.Id)
+            .FirstOrDefaultAsync(Context.ConnectionAborted);
+
+        if (tableId is null)
+            throw new HubException("Không tìm thấy bàn.");
+
+        await Groups.AddToGroupAsync(
+            Context.ConnectionId,
+            GetTableGroup(tableId.Value),
+            Context.ConnectionAborted);
+    }
+
+    public Task LeaveCustomerNotifications(int tableId)
+    {
+        if (tableId <= 0)
+            throw new HubException("Mã bàn không hợp lệ.");
+
+        return Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            GetTableGroup(tableId),
+            Context.ConnectionAborted);
+    }
+
     public static string GetUserGroup(int userId) => $"user:{userId}";
+
+    public static string GetTableGroup(int tableId) => $"table:{tableId}";
 }

@@ -181,6 +181,8 @@ public class AppDbContext : DbContext
                 .WithMany(x => x.Notifications)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.TableId);
         });
 
 

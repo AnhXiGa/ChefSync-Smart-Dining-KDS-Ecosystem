@@ -16,6 +16,7 @@ public class ProductDto
     public decimal Price { get; set; }
     public string? ImageUrl { get; set; }
     public int? PreparationTime { get; set; }
+    public int? AvailableQuantity { get; set; }
 }
 
 public class CategoryWithProductsDto

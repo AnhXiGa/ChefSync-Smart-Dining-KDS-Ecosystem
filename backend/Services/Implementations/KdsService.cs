@@ -12,6 +12,7 @@ namespace backend.Services.Implementations;
 public sealed class KdsService(
     AppDbContext context,
     IInventoryService inventoryService,
+    INotificationService notificationService,
     IHubContext<OrderHub> orderHub) : IKdsService
 {
     private static readonly string[] ActiveOrderStatuses =
@@ -31,18 +32,35 @@ public sealed class KdsService(
         "Served"
     ];
 
-    public async Task<IReadOnlyList<KdsOrderResponse>> GetOrdersAsync(
+    public async Task<KdsOrdersPageResponse> GetOrdersAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken)
     {
-        var orders = await context.Orders
+        if (page < 1)
+            throw new ArgumentOutOfRangeException(nameof(page), "Trang phải lớn hơn 0.");
+        if (pageSize is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(pageSize), "Số đơn mỗi trang phải từ 1 đến 100.");
+        var skip = (long)(page - 1) * pageSize;
+        if (skip > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(page), "Số trang vượt quá giới hạn.");
+
+        var query = context.Orders
             .AsNoTracking()
             .Where(order => ActiveOrderStatuses.Contains(order.Status))
+            .AsQueryable();
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var orders = await query
             .Include(order => order.Table)
             .Include(order => order.OrderItems)
-            .OrderBy(order => order.CreatedAt)
+            .OrderByDescending(order => order.CreatedAt)
+            .ThenByDescending(order => order.Id)
+            .Skip((int)skip)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return orders
+        var items = orders
             .Select(order => new KdsOrderResponse(
                 order.Id,
                 order.OrderCode,
@@ -57,6 +75,13 @@ public sealed class KdsService(
                     .Select(item => MapOrderItem(item, order))
                     .ToList()))
             .ToList();
+
+        return new KdsOrdersPageResponse(
+            items,
+            page,
+            pageSize,
+            totalCount,
+            (int)Math.Ceiling(totalCount / (double)pageSize));
     }
 
     public async Task<IReadOnlyList<KdsOrderItemResponse>> GetOrderItemsAsync(
@@ -154,6 +179,14 @@ public sealed class KdsService(
         await transaction.CommitAsync(cancellationToken);
 
         var response = MapOrderItem(item, item.Order);
+        await notificationService.CreateForTableAsync(
+            item.Order.TableId,
+            "Trạng thái món đã cập nhật",
+            $"{item.Quantity} × {item.ProductName}: {GetCustomerStatusLabel(normalizedTarget)}.",
+            "OrderStatus",
+            "OrderItem",
+            item.Id,
+            cancellationToken);
         await Task.WhenAll(
             orderHub.Clients
                 .Group(OrderHub.GetOrderGroup(item.OrderId))
@@ -235,6 +268,16 @@ public sealed class KdsService(
             "READY" => "Ready",
             "SERVED" => "Served",
             _ => status.Trim()
+        };
+
+    private static string GetCustomerStatusLabel(string status) =>
+        status switch
+        {
+            "Accepted" => "bếp đã nhận món",
+            "Preparing" => "đang chế biến",
+            "Ready" => "món đã sẵn sàng",
+            "Served" => "món đã được phục vụ",
+            _ => status
         };
 
     private static int GetCount(

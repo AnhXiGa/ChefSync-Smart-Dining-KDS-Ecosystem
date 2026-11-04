@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { HubConnectionBuilder } from '@microsoft/signalr';
 import { createPayment } from '../../api/paymentApi';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5266').replace(/\/+$/, '');
@@ -52,6 +53,9 @@ function CustomerMobileMenu() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccessCode, setOrderSuccessCode] = useState(null);
   const [placedOrders, setPlacedOrders] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationError, setNotificationError] = useState('');
+  const [orderUpdatesError, setOrderUpdatesError] = useState('');
   const [cancelingItemId, setCancelingItemId] = useState(null);
   const [payment, setPayment] = useState(null);
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
@@ -59,13 +63,48 @@ function CustomerMobileMenu() {
   const [isPaymentPage, setIsPaymentPage] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('QR');
   const [isSubmittedPage, setIsSubmittedPage] = useState(false);
+  const [staffCallType, setStaffCallType] = useState('');
+  const [staffCallError, setStaffCallError] = useState('');
+  const [staffCallSuccess, setStaffCallSuccess] = useState('');
+  const orderHubConnection = useRef(null);
+  const notificationHubConnection = useRef(null);
 
-  const loadCustomerOrders = async () => {
+  const handleCallStaff = useCallback(async (requestType) => {
+    setStaffCallType(requestType);
+    setStaffCallError('');
+    setStaffCallSuccess('');
+
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/call-staff`, null, {
+        params: { qrToken, requestType },
+      });
+      setStaffCallSuccess(data.message);
+    } catch (requestError) {
+      setStaffCallError(
+        requestError.response?.data?.message ||
+        requestError.message ||
+        'Không thể gửi yêu cầu đến nhân viên.',
+      );
+    } finally {
+      setStaffCallType('');
+    }
+  }, [qrToken]);
+
+  const loadCustomerOrders = useCallback(async () => {
     const response = await axios.get(`${API_BASE_URL}/orders`, {
       params: { qrToken },
     });
     setPlacedOrders(response.data || []);
-  };
+    return response.data || [];
+  }, [qrToken]);
+
+  const loadNotifications = useCallback(async () => {
+    const response = await axios.get(`${API_BASE_URL}/notifications`, {
+      params: { qrToken },
+    });
+    setNotifications(response.data || []);
+    setNotificationError('');
+  }, [qrToken]);
 
   useEffect(() => {
     const initPage = async () => {
@@ -98,6 +137,163 @@ function CustomerMobileMenu() {
     initPage();
   }, [qrToken]);
 
+  useEffect(() => {
+    if (!tableInfo?.tableId || !qrToken) return undefined;
+
+    let isActive = true;
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/notifications`)
+      .withAutomaticReconnect()
+      .build();
+    notificationHubConnection.current = connection;
+
+    const handleNotificationsChanged = () => {
+      if (isActive) {
+        void loadNotifications().catch((requestError) => {
+          if (isActive) {
+            setNotificationError(
+              requestError.response?.data?.message || requestError.message,
+            );
+          }
+        });
+      }
+    };
+
+    connection.on('NotificationsChanged', handleNotificationsChanged);
+    connection.onreconnecting(() => {
+      if (isActive) setNotificationError('Đang kết nối lại thông báo...');
+    });
+    connection.onreconnected(async () => {
+      try {
+        await connection.invoke('JoinCustomerNotifications', qrToken);
+        await loadNotifications();
+      } catch (connectionError) {
+        if (isActive) setNotificationError(connectionError.message);
+      }
+    });
+    connection.onclose((connectionError) => {
+      if (isActive && connectionError) {
+        setNotificationError(`Mất kết nối thông báo: ${connectionError.message}`);
+      }
+    });
+
+    const connect = async () => {
+      try {
+        await connection.start();
+        if (!isActive) return;
+        await connection.invoke('JoinCustomerNotifications', qrToken);
+        await loadNotifications();
+      } catch (connectionError) {
+        if (isActive) {
+          setNotificationError(`Không thể kết nối thông báo: ${connectionError.message}`);
+        }
+      }
+    };
+    void connect();
+
+    return () => {
+      isActive = false;
+      if (notificationHubConnection.current === connection) {
+        notificationHubConnection.current = null;
+      }
+      connection.off('NotificationsChanged', handleNotificationsChanged);
+      connection.stop().catch((connectionError) => {
+        console.error('Could not stop the customer notifications connection.', connectionError);
+      });
+    };
+  }, [loadNotifications, qrToken, tableInfo?.tableId]);
+
+  useEffect(() => {
+    if (!tableInfo?.tableId || !qrToken) return undefined;
+
+    let isActive = true;
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/orders`)
+      .withAutomaticReconnect()
+      .build();
+
+    orderHubConnection.current = connection;
+
+    const joinOrders = async (orders) => {
+      await Promise.all(
+        orders.map((order) => connection.invoke('JoinOrder', order.id)),
+      );
+    };
+
+    const handleItemStatusChanged = (updatedItem) => {
+      if (!isActive) return;
+
+      setPlacedOrders((orders) =>
+        orders.map((order) =>
+          order.id === updatedItem.orderId
+            ? {
+                ...order,
+                items: order.items.map((item) =>
+                  item.id === updatedItem.id
+                    ? {
+                        ...item,
+                        status: updatedItem.status,
+                        canCancel: ['Pending', 'Accepted'].includes(updatedItem.status),
+                      }
+                    : item,
+                ),
+              }
+            : order,
+        ),
+      );
+    };
+
+    connection.on('OrderItemStatusChanged', handleItemStatusChanged);
+    connection.onreconnecting(() => {
+      if (isActive) setOrderUpdatesError('Đang kết nối lại để đồng bộ trạng thái món.');
+    });
+    connection.onreconnected(async () => {
+      try {
+        const latestOrders = await loadCustomerOrders();
+        if (!isActive) return;
+        await joinOrders(latestOrders);
+        setOrderUpdatesError('');
+      } catch (connectionError) {
+        if (!isActive) return;
+        setOrderUpdatesError(`Không thể đồng bộ trạng thái món: ${connectionError.message}`);
+      }
+    });
+    connection.onclose((connectionError) => {
+      if (!isActive) return;
+      if (connectionError) {
+        setOrderUpdatesError(`Mất kết nối cập nhật trạng thái món: ${connectionError.message}`);
+      }
+    });
+
+    const connect = async () => {
+      try {
+        await connection.start();
+        if (!isActive) return;
+        const latestOrders = await loadCustomerOrders();
+        if (!isActive) return;
+        await joinOrders(latestOrders);
+        setOrderUpdatesError('');
+      } catch (connectionError) {
+        if (isActive) {
+          setOrderUpdatesError(`Không thể kết nối cập nhật trạng thái món: ${connectionError.message}`);
+        }
+      }
+    };
+
+    void connect();
+
+    return () => {
+      isActive = false;
+      if (orderHubConnection.current === connection) {
+        orderHubConnection.current = null;
+      }
+      connection.off('OrderItemStatusChanged', handleItemStatusChanged);
+      connection.stop().catch((connectionError) => {
+        console.error('Could not stop the customer order hub connection.', connectionError);
+      });
+    };
+  }, [loadCustomerOrders, qrToken, tableInfo?.tableId]);
+
   const filteredCategories = useMemo(() => {
     return categories
       .filter((category) => selectedCategoryId === 'ALL' || category.id === selectedCategoryId)
@@ -115,14 +311,22 @@ function CustomerMobileMenu() {
   }, [categories, searchQuery, selectedCategoryId]);
 
   const addToCart = (product) => {
+    const availableQuantity = product.availableQuantity;
     setCart((previous) => {
       const existingItem = previous.find((item) => item.product.id === product.id);
       if (existingItem) {
+        if (availableQuantity !== null && availableQuantity !== undefined &&
+          existingItem.quantity >= availableQuantity) {
+          return previous;
+        }
         return previous.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
         );
       }
-
+      if (availableQuantity !== null && availableQuantity !== undefined &&
+        availableQuantity <= 0) {
+        return previous;
+      }
       return [...previous, { product, quantity: 1, note: '' }];
     });
   };
@@ -130,9 +334,14 @@ function CustomerMobileMenu() {
   const updateQuantity = (productId, delta) => {
     setCart((previous) =>
       previous
-        .map((item) =>
-          item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item,
-        )
+        .map((item) => {
+          if (item.product.id !== productId) return item;
+          const maxQuantity = item.product.availableQuantity;
+          const nextQuantity = maxQuantity !== null && maxQuantity !== undefined
+            ? Math.min(item.quantity + delta, maxQuantity)
+            : item.quantity + delta;
+          return { ...item, quantity: nextQuantity };
+        })
         .filter((item) => item.quantity > 0),
     );
   };
@@ -186,12 +395,21 @@ function CustomerMobileMenu() {
           note: item.note,
         })),
       });
-
+      if (orderHubConnection.current?.state === 'Connected') {
+        void orderHubConnection.current
+          .invoke('JoinOrder', response.data.orderId)
+          .catch((connectionError) => {
+            setOrderUpdatesError(`Không thể đăng ký cập nhật đơn: ${connectionError.message}`);
+          });
+      }
       setOrderSuccessCode(response.data.orderCode);
       setCart([]);
       setOrderNote('');
       setIsCartOpen(false);
       await loadCustomerOrders().catch(() => {});
+      await axios.get(`${API_BASE_URL}/menu`)
+        .then((menuResponse) => setCategories(menuResponse.data || []))
+        .catch(() => {});
       setIsSubmittedPage(true);
     } catch (err) {
       alert(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đơn gọi món.');
@@ -249,6 +467,65 @@ function CustomerMobileMenu() {
       setCancelingItemId(null);
     }
   };
+
+  const markCustomerNotificationAsRead = async (notification) => {
+    if (notification.isRead) return;
+
+    try {
+      const { data } = await axios.patch(
+        `${API_BASE_URL}/notifications/${notification.id}/read`,
+        null,
+        { params: { qrToken } },
+      );
+      setNotifications((current) =>
+        current.map((item) => (item.id === data.id ? data : item)),
+      );
+    } catch (requestError) {
+      setNotificationError(
+        requestError.response?.data?.message || requestError.message,
+      );
+    }
+  };
+
+  const customerNotifications = notifications.length > 0 || notificationError ? (
+    <section className="customer-notifications" aria-live="polite">
+      <div className="customer-notifications-heading">
+        <h3>Thông báo</h3>
+        {notifications.some((notification) => !notification.isRead) && (
+          <button
+            type="button"
+            onClick={() =>
+              Promise.all(
+                notifications
+                  .filter((notification) => !notification.isRead)
+                  .map(markCustomerNotificationAsRead),
+              )
+            }
+          >
+            Đọc tất cả
+          </button>
+        )}
+      </div>
+      {notificationError && <p role="alert">{notificationError}</p>}
+      {notifications.slice(0, 10).map((notification) => (
+        <button
+          type="button"
+          className={`customer-notification ${notification.isRead ? '' : 'unread'}`}
+          key={notification.id}
+          onClick={() => void markCustomerNotificationAsRead(notification)}
+        >
+          <strong>{notification.title}</strong>
+          <span>{notification.message}</span>
+          <time dateTime={notification.createdAt}>
+            {new Date(notification.createdAt).toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </time>
+        </button>
+      ))}
+    </section>
+  ) : null;
 
   if (loading) {
     return (
@@ -341,10 +618,14 @@ function CustomerMobileMenu() {
 
             <section className="submitted-items-card">
               <h3>Từng món của bạn</h3>
+              {orderUpdatesError && <p role="alert">{orderUpdatesError}</p>}
               {latestOrder.items.map((item) => (
                 <div className="submitted-item-row" key={item.id}>
                   <strong>{item.quantity} × {item.productName}</strong>
-                  <span>{item.status === 'Served' ? 'Đã phục vụ' : item.status === 'Cancelled' ? 'Đã hủy' : `${item.note || 'Đang xử lý'}`}</span>
+                  <span>
+                    {orderItemStatusLabels[item.status] || item.status}
+                    {item.note ? ` · ${item.note}` : ''}
+                  </span>
                   <b>{formatCurrency(item.subtotal || item.unitPrice * item.quantity)}</b>
                 </div>
               ))}
@@ -357,6 +638,7 @@ function CustomerMobileMenu() {
                   : 'Vừa đặt'}
               </div>
             </section>
+            {customerNotifications}
 
             <div className="submitted-note">
               <span>ⓘ</span>
@@ -379,9 +661,10 @@ function CustomerMobileMenu() {
             <div className="submitted-actions">
               <button
                 type="button"
-                onClick={() => window.alert('Đã gửi yêu cầu đến nhân viên hỗ trợ.')}
+                disabled={staffCallType !== ''}
+                onClick={() => void handleCallStaff('assistance')}
               >
-                Gọi nhân viên
+                {staffCallType === 'assistance' ? 'Đang gửi...' : 'Gọi nhân viên'}
               </button>
               <button
                 type="button"
@@ -391,6 +674,8 @@ function CustomerMobileMenu() {
                 Yêu cầu thanh toán
               </button>
             </div>
+            {staffCallSuccess && <p role="status">{staffCallSuccess}</p>}
+            {staffCallError && <p className="customer-payment-error" role="alert">{staffCallError}</p>}
           </main>
         </div>
       </div>
@@ -501,9 +786,10 @@ function CustomerMobileMenu() {
                   <p>Vui lòng gọi nhân viên để thanh toán bằng tiền mặt.</p>
                   <button
                     type="button"
-                    onClick={() => window.alert('Đã gửi yêu cầu đến nhân viên hỗ trợ thanh toán.')}
+                    disabled={staffCallType !== ''}
+                    onClick={() => void handleCallStaff('payment')}
                   >
-                    Gọi nhân viên thanh toán
+                    {staffCallType === 'payment' ? 'Đang gửi...' : 'Gọi nhân viên thanh toán'}
                   </button>
                 </div>
               )}
@@ -519,11 +805,14 @@ function CustomerMobileMenu() {
             <button
               type="button"
               className="payment-call-staff-button"
-              onClick={() => window.alert('Đã gửi yêu cầu đến nhân viên hỗ trợ thanh toán.')}
+              disabled={staffCallType !== ''}
+              onClick={() => void handleCallStaff('payment')}
             >
               <span>♟</span>
-              Gọi nhân viên hỗ trợ
+              {staffCallType === 'payment' ? 'Đang gửi...' : 'Gọi nhân viên hỗ trợ'}
             </button>
+            {staffCallSuccess && <p role="status">{staffCallSuccess}</p>}
+            {staffCallError && <p className="customer-payment-error" role="alert">{staffCallError}</p>}
           </main>
         </div>
       </div>
@@ -613,8 +902,18 @@ function CustomerMobileMenu() {
 
                       <div className="meta-row">
                         {product.preparationTime ? <span>⏱ {product.preparationTime} phút</span> : <span>⏱ 15 phút</span>}
-                        <button type="button" onClick={() => addToCart(product)}>
-                          + Thêm
+                        <button
+                          type="button"
+                          onClick={() => addToCart(product)}
+                          disabled={product.availableQuantity !== null &&
+                            product.availableQuantity !== undefined &&
+                            product.availableQuantity <= 0}
+                        >
+                          {product.availableQuantity !== null &&
+                          product.availableQuantity !== undefined &&
+                          product.availableQuantity <= 0
+                            ? 'Hết nguyên liệu'
+                            : '+ Thêm'}
                         </button>
                       </div>
                     </div>
@@ -669,6 +968,8 @@ function CustomerMobileMenu() {
 
               {placedOrders.length > 0 && (
                 <section className="cart-placed-orders">
+                  {orderUpdatesError && <p role="alert">{orderUpdatesError}</p>}
+                  {customerNotifications}
                   {placedOrders.map((order) => (
                     <article className="cart-placed-order" key={order.id}>
                       <div className="cart-placed-order-heading">
@@ -747,7 +1048,15 @@ function CustomerMobileMenu() {
                             <div className="stepper">
                               <button type="button" onClick={() => updateQuantity(item.product.id, -1)}>−</button>
                               <span>{item.quantity}</span>
-                              <button type="button" onClick={() => updateQuantity(item.product.id, 1)}>+</button>
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.product.id, 1)}
+                                disabled={item.product.availableQuantity !== null &&
+                                  item.product.availableQuantity !== undefined &&
+                                  item.quantity >= item.product.availableQuantity}
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
                           <strong className="cart-line-total">

@@ -9,12 +9,29 @@ public sealed class KdsController(IKdsService kdsService)
     : ApiScaffoldController
 {
     [HttpGet("orders")]
-    [ProducesResponseType(typeof(IReadOnlyList<KdsOrderResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<KdsOrderResponse>>> GetOrders(
-        CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(KdsOrdersPageResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<KdsOrdersPageResponse>> GetOrders(
+        CancellationToken cancellationToken,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 6)
     {
-        var orders = await kdsService.GetOrdersAsync(cancellationToken);
-        return Ok(orders);
+        try
+        {
+            return Ok(await kdsService.GetOrdersAsync(
+                page,
+                pageSize,
+                cancellationToken));
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Tham số phân trang không hợp lệ.",
+                Detail = exception.Message
+            });
+        }
     }
 
     [HttpGet("order-items")]

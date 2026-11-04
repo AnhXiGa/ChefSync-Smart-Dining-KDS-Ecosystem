@@ -26,4 +26,31 @@ public interface INotificationService
         int id,
         int userId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<NotificationResponse>> GetCustomerNotificationsAsync(
+        int tableId,
+        CancellationToken cancellationToken);
+
+    Task<NotificationResponse?> MarkCustomerNotificationAsReadAsync(
+        int id,
+        int tableId,
+        CancellationToken cancellationToken);
+
+    Task<NotificationResponse> CreateForTableAsync(
+        int tableId,
+        string title,
+        string message,
+        string type,
+        string? referenceType,
+        int? referenceId,
+        CancellationToken cancellationToken);
+
+    Task CreateForRolesAsync(
+        IReadOnlyCollection<string> roleNames,
+        string title,
+        string message,
+        string type,
+        string? referenceType,
+        int? referenceId,
+        CancellationToken cancellationToken);
 }

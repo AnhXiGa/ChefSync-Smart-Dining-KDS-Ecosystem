@@ -3,6 +3,7 @@ using backend.DTOs;
 using backend.DTOs.Kds;
 using backend.Hubs;
 using backend.Models;
+using backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -15,11 +16,16 @@ public sealed class CustomerController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IHubContext<OrderHub> _orderHub;
+    private readonly INotificationService _notificationService;
 
-    public CustomerController(AppDbContext context, IHubContext<OrderHub> orderHub)
+    public CustomerController(
+        AppDbContext context,
+        IHubContext<OrderHub> orderHub,
+        INotificationService notificationService)
     {
         _context = context;
         _orderHub = orderHub;
+        _notificationService = notificationService;
     }
 
     [HttpGet("verify-table/{qrToken}")]
@@ -68,34 +74,86 @@ public sealed class CustomerController : ControllerBase
     public async Task<IActionResult> GetMenu([FromQuery] string? search, [FromQuery] int? categoryId)
     {
         var normalizedSearch = string.IsNullOrWhiteSpace(search) ? string.Empty : search.Trim();
-
-        var query = _context.Categories
+        var categories = await _context.Categories
             .AsNoTracking()
             .Where(c => c.IsActive)
+            .Include(c => c.Products)
+                .ThenInclude(p => p.ProductIngredients)
+                .ThenInclude(pi => pi.Ingredient)
             .OrderBy(c => c.DisplayOrder)
-            .Select(c => new CategoryWithProductsDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                DisplayOrder = c.DisplayOrder,
-                Products = c.Products
-                    .Where(p => p.IsAvailable &&
-                        (!categoryId.HasValue || p.CategoryId == categoryId.Value) &&
-                        (string.IsNullOrEmpty(normalizedSearch) || p.Name.ToLower().Contains(normalizedSearch.ToLower())))
-                    .Select(p => new ProductDto
-                    {
-                        Id = p.Id,
-                        CategoryId = p.CategoryId,
-                        Name = p.Name,
-                        Description = p.Description,
-                        Price = p.Price,
-                        ImageUrl = p.ImageUrl,
-                        PreparationTime = p.PreparationTime
-                    })
-                    .ToList()
-            });
+            .ToListAsync();
 
-        var result = await query.ToListAsync();
+        var bom = await _context.ProductIngredients
+            .AsNoTracking()
+            .Include(pi => pi.Ingredient)
+            .ToListAsync();
+
+        var reservedItems = await _context.OrderItems
+            .AsNoTracking()
+            .Include(item => item.Order)
+            .Where(item =>
+                item.Status != "Ready" &&
+                item.Status != "Served" &&
+                item.Status != "Cancelled" &&
+                item.Order.Status != "Completed" &&
+                item.Order.Status != "Cancelled")
+            .Select(item => new { item.ProductId, item.Quantity })
+            .ToListAsync();
+
+        var reservedByProduct = reservedItems
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity));
+
+        var availableQuantities = new Dictionary<int, int>();
+        foreach (var product in categories.SelectMany(c => c.Products))
+        {
+            var recipe = bom.Where(pi => pi.ProductId == product.Id).ToList();
+            if (recipe.Count == 0)
+            {
+                availableQuantities[product.Id] = 999;
+                continue;
+            }
+
+            var capacities = recipe.Select(pi =>
+            {
+                var reservedQuantity = reservedByProduct
+                    .Where(pair => pair.Key == product.Id)
+                    .Select(pair => pair.Value)
+                    .FirstOrDefault();
+                var reservedUsage = recipe
+                    .Where(pi2 => pi2.IngredientId == pi.IngredientId)
+                    .Sum(pi2 => pi2.Quantity * reservedQuantity);
+                var usableStock = Math.Max(0m, pi.Ingredient.CurrentStock - reservedUsage);
+                return pi.Quantity > 0 ? (int)Math.Floor(usableStock / pi.Quantity) : 0;
+            });
+            availableQuantities[product.Id] = capacities.Any() ? capacities.Min() : 0;
+        }
+
+        var result = categories.Select(c => new CategoryWithProductsDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            DisplayOrder = c.DisplayOrder,
+            Products = c.Products
+                .Where(p => p.IsAvailable &&
+                    (!categoryId.HasValue || p.CategoryId == categoryId.Value) &&
+                    (string.IsNullOrEmpty(normalizedSearch) ||
+                        p.Name.ToLower().Contains(normalizedSearch.ToLower())))
+                .Select(p => new ProductDto
+                {
+                    Id = p.Id,
+                    CategoryId = p.CategoryId,
+                    Name = p.Name,
+                    Description = p.Description,
+                    Price = p.Price,
+                    ImageUrl = p.ImageUrl,
+                    PreparationTime = p.PreparationTime,
+                    AvailableQuantity = availableQuantities.TryGetValue(p.Id, out var quantity)
+                        ? quantity
+                        : 0
+                })
+                .ToList()
+        }).ToList();
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch) || categoryId.HasValue)
             result = result.Where(c => c.Products.Any()).ToList();
@@ -146,6 +204,72 @@ public sealed class CustomerController : ControllerBase
             .ToListAsync();
 
         return Ok(orders);
+    }
+
+    [HttpGet("notifications")]
+    public async Task<IActionResult> GetCustomerNotifications(
+        [FromQuery] string qrToken,
+        CancellationToken cancellationToken)
+    {
+        var table = await FindTableByQrTokenAsync(qrToken, cancellationToken);
+        if (table is null)
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        return Ok(await _notificationService.GetCustomerNotificationsAsync(
+            table.Id,
+            cancellationToken));
+    }
+
+    [HttpPatch("notifications/{id:int}/read")]
+    public async Task<IActionResult> MarkCustomerNotificationAsRead(
+        int id,
+        [FromQuery] string qrToken,
+        CancellationToken cancellationToken)
+    {
+        var table = await FindTableByQrTokenAsync(qrToken, cancellationToken);
+        if (table is null)
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        var notification = await _notificationService.MarkCustomerNotificationAsReadAsync(
+            id,
+            table.Id,
+            cancellationToken);
+        return notification is null ? NotFound() : Ok(notification);
+    }
+
+    [HttpPost("call-staff")]
+    public async Task<IActionResult> CallStaff(
+        [FromQuery] string qrToken,
+        [FromQuery] string requestType,
+        CancellationToken cancellationToken)
+    {
+        var table = await FindTableByQrTokenAsync(qrToken, cancellationToken);
+        if (table is null)
+            return BadRequest(new { message = "Mã QR không hợp lệ." });
+
+        var (title, message) = requestType switch
+        {
+            "assistance" => (
+                "Khách cần nhân viên hỗ trợ",
+                $"Khách tại bàn {table.TableNumber} đang cần hỗ trợ."),
+            "payment" => (
+                "Khách yêu cầu thanh toán",
+                $"Khách tại bàn {table.TableNumber} yêu cầu nhân viên hỗ trợ thanh toán."),
+            _ => (null, null)
+        };
+        if (title is null || message is null)
+            return BadRequest(new { message = "Loại yêu cầu không hợp lệ." });
+
+        await _notificationService.CreateForRolesAsync(
+            ["Waiter", "Manager", "Admin"],
+            title,
+            message,
+            "StaffCall",
+            "Table",
+            table.Id,
+            cancellationToken);
+
+        return Ok(new { message = "Đã gửi yêu cầu đến nhân viên." });
     }
 
     [HttpPost("orders/items/{itemId:int}/cancel")]
@@ -226,6 +350,14 @@ public sealed class CustomerController : ControllerBase
                 ? new DateTimeOffset(DateTime.SpecifyKind(item.ReadyAt.Value, DateTimeKind.Utc))
                 : null);
 
+        await _notificationService.CreateForRolesAsync(
+            ["Chef"],
+            "Khách đã hủy món",
+            $"Bàn {table.TableNumber} đã hủy {item.Quantity} × {item.ProductName}.",
+            "OrderCancelled",
+            "OrderItem",
+            item.Id,
+            cancellationToken);
         await Task.WhenAll(
             _orderHub.Clients
                 .Group(OrderHub.GetOrderGroup(order.Id))
@@ -248,7 +380,9 @@ public sealed class CustomerController : ControllerBase
     }
 
     [HttpPost("orders")]
-    public async Task<IActionResult> PlaceOrder([FromBody] CreateOrderRequestDto request)
+    public async Task<IActionResult> PlaceOrder(
+        [FromBody] CreateOrderRequestDto request,
+        CancellationToken cancellationToken)
     {
         if (request == null)
             return BadRequest(new { message = "Dữ liệu đặt món không hợp lệ." });
@@ -277,6 +411,54 @@ public sealed class CustomerController : ControllerBase
             .Where(p => productIds.Contains(p.Id) && p.IsAvailable)
             .ToDictionaryAsync(p => p.Id);
 
+        var requestedTotals = request.Items
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity));
+
+        var recipes = await _context.ProductIngredients
+            .AsNoTracking()
+            .Include(pi => pi.Ingredient)
+            .Where(pi => productIds.Contains(pi.ProductId))
+            .ToListAsync();
+
+        var reservedItems = await _context.OrderItems
+            .AsNoTracking()
+            .Where(item =>
+                item.Status != "Ready" &&
+                item.Status != "Served" &&
+                item.Status != "Cancelled" &&
+                item.Order.Status != "Completed" &&
+                item.Order.Status != "Cancelled")
+            .Select(item => new { item.ProductId, item.Quantity })
+            .ToListAsync();
+
+        var reservedByProduct = reservedItems
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Quantity));
+
+        foreach (var productId in productIds)
+        {
+            var recipe = recipes.Where(pi => pi.ProductId == productId).ToList();
+            if (recipe.Count == 0)
+                continue;
+
+            var reservedQuantity = reservedByProduct.GetValueOrDefault(productId);
+            foreach (var requiredIngredient in recipe)
+            {
+                var reservedUsage = requiredIngredient.Quantity * reservedQuantity;
+                var requestedUsage = requiredIngredient.Quantity * requestedTotals.GetValueOrDefault(productId);
+                var usableStock = requiredIngredient.Ingredient.CurrentStock - reservedUsage;
+                if (requestedUsage > usableStock)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"Nguyên liệu {requiredIngredient.Ingredient.Name} không đủ để thêm món này. " +
+                            $"Hiện chỉ còn {Math.Max(0, (int)Math.Floor(usableStock / requiredIngredient.Quantity))} phần."
+                    });
+                }
+            }
+        }
+
         using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
@@ -302,14 +484,17 @@ public sealed class CustomerController : ControllerBase
                 };
                 _context.Orders.Add(order);
             }
-            else if (!string.IsNullOrWhiteSpace(request.Note))
+            else if (order is not null && !string.IsNullOrWhiteSpace(request.Note))
             {
                 order.Note = string.IsNullOrWhiteSpace(order.Note)
                     ? request.Note
                     : $"{order.Note}\n{request.Note}";
             }
 
-            var existingSubtotal = order.OrderItems
+            var activeOrder = order
+                ?? throw new InvalidOperationException("Không thể tạo đơn hàng.");
+
+            var existingSubtotal = activeOrder.OrderItems
                 .Where(orderItem => orderItem.Status != "Cancelled")
                 .Sum(orderItem => orderItem.Subtotal);
             decimal subtotal = existingSubtotal;
@@ -325,7 +510,7 @@ public sealed class CustomerController : ControllerBase
                 var itemSubtotal = product.Price * item.Quantity;
                 subtotal += itemSubtotal;
 
-                order.OrderItems.Add(new OrderItem
+                activeOrder.OrderItems.Add(new OrderItem
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
@@ -338,11 +523,11 @@ public sealed class CustomerController : ControllerBase
                 });
             }
 
-            order.Subtotal = subtotal;
-            order.Discount = 0;
-            order.Tax = subtotal * 0.08m;
-            order.TotalAmount = order.Subtotal + order.Tax - order.Discount;
-            order.UpdatedAt = DateTime.UtcNow;
+            activeOrder.Subtotal = subtotal;
+            activeOrder.Discount = 0;
+            activeOrder.Tax = subtotal * 0.08m;
+            activeOrder.TotalAmount = activeOrder.Subtotal + activeOrder.Tax - activeOrder.Discount;
+            activeOrder.UpdatedAt = DateTime.UtcNow;
 
             table.Status = "Occupied";
             table.UpdatedAt = DateTime.UtcNow;
@@ -350,12 +535,40 @@ public sealed class CustomerController : ControllerBase
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            await _notificationService.CreateForTableAsync(
+                table.Id,
+                "Đã nhận đơn gọi món",
+                $"Đơn {activeOrder.OrderCode} của bạn đã được gửi đến bếp.",
+                "Order",
+                "Order",
+                activeOrder.Id,
+                cancellationToken);
+            await _notificationService.CreateForRolesAsync(
+                ["Chef"],
+                "Có món mới cần chế biến",
+                $"Bàn {table.TableNumber} vừa gửi món trong đơn {activeOrder.OrderCode}.",
+                "Order",
+                "Order",
+                activeOrder.Id,
+                cancellationToken);
+            await _notificationService.CreateForRolesAsync(
+                ["Manager", "Admin"],
+                "Có đơn gọi món mới",
+                $"Bàn {table.TableNumber} vừa gửi món trong đơn {activeOrder.OrderCode}.",
+                "Order",
+                "Order",
+                activeOrder.Id,
+                cancellationToken);
+            await _orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync("KdsOrdersChanged", cancellationToken);
+
             return Ok(new
             {
                 message = "Đặt món thành công!",
-                orderId = order.Id,
-                orderCode = order.OrderCode,
-                totalAmount = order.TotalAmount
+                orderId = activeOrder.Id,
+                orderCode = activeOrder.OrderCode,
+                totalAmount = activeOrder.TotalAmount
             });
         }
         catch (Exception ex)
@@ -363,5 +576,17 @@ public sealed class CustomerController : ControllerBase
             await transaction.RollbackAsync();
             return StatusCode(500, new { message = "Lỗi hệ thống khi tạo đơn hàng.", detail = ex.Message });
         }
+    }
+
+    private Task<RestaurantTable?> FindTableByQrTokenAsync(
+        string? qrToken,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(qrToken, out var token))
+            return Task.FromResult<RestaurantTable?>(null);
+
+        return _context.RestaurantTables.FirstOrDefaultAsync(
+            table => table.QrToken == token,
+            cancellationToken);
     }
 }
