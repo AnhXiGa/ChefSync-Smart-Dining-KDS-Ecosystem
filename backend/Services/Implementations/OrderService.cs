@@ -139,8 +139,13 @@ public class OrderService : IOrderService
 
         _context.Orders.Add(order);
 
+        var occupancyStartedAt = DateTime.UtcNow;
+        if (table.Status != "Occupied")
+        {
+            table.OccupiedAt = occupancyStartedAt;
+        }
+
         table.Status = "Occupied";
-        table.OccupiedAt ??= DateTime.UtcNow;
         table.VacatedAt = null;
         table.UpdatedAt = DateTime.UtcNow;
 
@@ -286,6 +291,36 @@ public class OrderService : IOrderService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
+        return MapToResponse(order);
+    }
+
+    public async Task<OrderResponse> UpdateDiscountAsync(
+        int orderId,
+        UpdateOrderDiscountRequest request)
+    {
+        var percentage = request.Percentage;
+        if (percentage < 0 || percentage > 100)
+            throw new Exception("Phần trăm giảm giá phải từ 0 đến 100.");
+
+        var order = await _context.Orders
+            .Include(x => x.Table)
+            .Include(x => x.OrderItems)
+            .FirstOrDefaultAsync(x => x.Id == orderId);
+
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng.");
+        if (order.Status is "Completed" or "Cancelled")
+            throw new Exception("Không thể sửa giảm giá cho đơn đã kết thúc.");
+
+        var pendingPayment = await _context.Payments.AnyAsync(payment =>
+            payment.OrderId == orderId && payment.Status == "Pending");
+        if (pendingPayment)
+            throw new Exception("Hãy hủy giao dịch thanh toán đang chờ trước khi sửa giảm giá.");
+
+        order.Discount = Math.Round(order.Subtotal * percentage / 100m, 2);
+        order.TotalAmount = Math.Max(0, order.Subtotal + order.Tax - order.Discount);
+        order.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
         return MapToResponse(order);
     }
 

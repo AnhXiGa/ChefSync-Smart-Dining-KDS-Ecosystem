@@ -529,7 +529,13 @@ public sealed class CustomerController : ControllerBase
             activeOrder.TotalAmount = activeOrder.Subtotal + activeOrder.Tax - activeOrder.Discount;
             activeOrder.UpdatedAt = DateTime.UtcNow;
 
+            if (table.Status != "Occupied")
+            {
+                table.OccupiedAt = DateTime.UtcNow;
+            }
+
             table.Status = "Occupied";
+            table.VacatedAt = null;
             table.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

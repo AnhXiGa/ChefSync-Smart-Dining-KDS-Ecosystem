@@ -641,6 +641,10 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => x.TransactionCode)
                 .IsUnique();
 
+            entity.HasIndex(x => x.OrderId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('Pending', 'Paid')");
+
 
             // -------------------------------------------------
             // RELATIONSHIP

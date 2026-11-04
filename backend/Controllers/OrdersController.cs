@@ -65,6 +65,21 @@ public sealed class OrdersController(
         }
     }
 
+    [HttpPatch("{id:int}/discount")]
+    public async Task<IActionResult> UpdateDiscount(
+        int id,
+        [FromBody] UpdateOrderDiscountRequest request)
+    {
+        try
+        {
+            return Ok(await orderService.UpdateDiscountAsync(id, request));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
     [HttpPost("{id:int}/transfer-table")]
     public async Task<IActionResult> TransferTable(
         int id,

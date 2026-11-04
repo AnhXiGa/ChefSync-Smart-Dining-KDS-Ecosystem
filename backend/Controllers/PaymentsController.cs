@@ -44,12 +44,7 @@ public sealed class PaymentsController(
     public async Task<IActionResult> GetByOrderId(int orderId)
     {
         var payment = await paymentService.GetByOrderIdAsync(orderId);
-        return payment is null
-            ? NotFound(new
-            {
-                message = "Đơn hàng chưa có giao dịch thanh toán."
-            })
-            : Ok(payment);
+        return Ok(payment);
     }
 
     [HttpPost("{id:int}/confirm-cash")]

@@ -15,6 +15,9 @@ public interface IOrderService
     Task<OrderResponse> UpdateStatusAsync(
         int orderId,
         UpdateOrderStatusRequest request);
+    Task<OrderResponse> UpdateDiscountAsync(
+        int orderId,
+        UpdateOrderDiscountRequest request);
 
     Task<OrderResponse> TransferTableAsync(
         int orderId,
