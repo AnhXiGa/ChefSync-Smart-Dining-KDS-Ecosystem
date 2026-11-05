@@ -42,6 +42,9 @@ export function StaffOrderPage() {
   useEffect(() => {
     void loadOperationsData();
   }, [loadOperationsData]);
+  useEffect(() => {
+    if (orderUpdates.changeVersion > 0) void loadOperationsData();
+  }, [loadOperationsData, orderUpdates.changeVersion]);
   const activeOrderBase = orders.find(
     (order) =>
       order.tableId === Number(tableId) &&

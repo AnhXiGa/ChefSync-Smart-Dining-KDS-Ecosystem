@@ -20,6 +20,7 @@ function getErrorMessage(error) {
 
 export function useTableOrderUpdates(tableId) {
   const [orders, setOrders] = useState([]);
+  const [changeVersion, setChangeVersion] = useState(0);
   const [error, setError] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("connecting");
 
@@ -51,6 +52,15 @@ export function useTableOrderUpdates(tableId) {
         tableOrders.map((order) => connection.invoke("JoinOrder", order.id)),
       );
     };
+    const refreshOrders = async () => {
+      const latestOrders = await loadOrders();
+      if (!isActive) return;
+      await joinOrders(latestOrders ?? []);
+      setChangeVersion((version) => version + 1);
+    };
+    const handleOrdersChanged = () => {
+      if (isActive) void refreshOrders();
+    };
 
     const handleItemStatusChanged = (updatedItem) => {
       if (!isActive) return;
@@ -72,6 +82,8 @@ export function useTableOrderUpdates(tableId) {
     };
 
     connection.on("OrderItemStatusChanged", handleItemStatusChanged);
+    connection.on("OrdersChanged", handleOrdersChanged);
+    connection.on("OrderChanged", handleOrdersChanged);
     connection.onreconnecting(() => {
       if (isActive) setConnectionStatus("connecting");
     });
@@ -79,6 +91,7 @@ export function useTableOrderUpdates(tableId) {
       try {
         const latestOrders = await loadOrders();
         if (!isActive) return;
+        await connection.invoke("JoinPos");
         await joinOrders(latestOrders ?? []);
         setConnectionStatus("connected");
       } catch (connectionError) {
@@ -104,6 +117,7 @@ export function useTableOrderUpdates(tableId) {
         const initialOrders = await loadOrders();
         await connection.start();
         if (!isActive) return;
+        await connection.invoke("JoinPos");
         await joinOrders(initialOrders ?? []);
         const latestOrders = await loadOrders();
         if (latestOrders) await joinOrders(latestOrders);
@@ -122,11 +136,13 @@ export function useTableOrderUpdates(tableId) {
     return () => {
       isActive = false;
       connection.off("OrderItemStatusChanged", handleItemStatusChanged);
+      connection.off("OrdersChanged", handleOrdersChanged);
+      connection.off("OrderChanged", handleOrdersChanged);
       connection.stop().catch((connectionError) => {
         console.error("Could not stop the order hub connection.", connectionError);
       });
     };
   }, [loadOrders]);
 
-  return { orders, error, connectionStatus };
+  return { orders, error, connectionStatus, changeVersion };
 }

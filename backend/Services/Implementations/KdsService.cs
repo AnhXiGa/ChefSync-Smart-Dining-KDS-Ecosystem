@@ -199,6 +199,21 @@ public sealed class KdsService(
                 .SendAsync(
                     "OrderItemStatusChanged",
                     response,
+                    cancellationToken),
+            orderHub.Clients
+                .Group(OrderHub.GetTableGroup(item.Order.TableId))
+                .SendAsync(
+                    "OrderItemStatusChanged",
+                    response,
+                    cancellationToken),
+            orderHub.Clients
+                .Group(OrderHub.PosGroupName)
+                .SendAsync("OrdersChanged", cancellationToken),
+            orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(item.OrderId))
+                .SendAsync(
+                    "OrderChanged",
+                    new { orderId = item.OrderId, tableId = item.Order.TableId },
                     cancellationToken));
 
         return response;

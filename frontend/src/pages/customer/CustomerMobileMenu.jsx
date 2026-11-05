@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { HubConnectionBuilder } from '@microsoft/signalr';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5266').replace(/\/+$/, '');
 const apiUrl = typeof window !== 'undefined' &&
@@ -34,13 +35,6 @@ const orderItemStatusLabels = {
   Cancelled: 'Đã hủy',
 };
 
-const tableStatusLabels = {
-  Available: 'Bàn trống',
-  Occupied: 'Đang phục vụ',
-  Reserved: 'Đã đặt trước',
-  Maintenance: 'Đang bảo trì',
-};
-
 function CustomerMobileMenu() {
   const [searchParams] = useSearchParams();
   const qrToken = searchParams.get('token') || '';
@@ -57,8 +51,6 @@ function CustomerMobileMenu() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccessCode, setOrderSuccessCode] = useState(null);
   const [placedOrders, setPlacedOrders] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [notificationError, setNotificationError] = useState('');
   const [orderUpdatesError, setOrderUpdatesError] = useState('');
   const [cancelingItemId, setCancelingItemId] = useState(null);
   const [isSubmittedPage, setIsSubmittedPage] = useState(false);
@@ -66,7 +58,6 @@ function CustomerMobileMenu() {
   const [staffCallError, setStaffCallError] = useState('');
   const [staffCallSuccess, setStaffCallSuccess] = useState('');
   const orderHubConnection = useRef(null);
-  const notificationHubConnection = useRef(null);
 
   const handleCallStaff = useCallback(async (requestType) => {
     setStaffCallType(requestType);
@@ -74,10 +65,10 @@ function CustomerMobileMenu() {
     setStaffCallSuccess('');
 
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/call-staff`, null, {
+      await axios.post(`${API_BASE_URL}/call-staff`, null, {
         params: { qrToken, requestType },
       });
-      setStaffCallSuccess(data.message);
+      setStaffCallSuccess('Đã gọi nhân viên. Vui lòng chờ nhân viên đến hỗ trợ.');
     } catch (requestError) {
       setStaffCallError(
         requestError.response?.data?.message ||
@@ -95,14 +86,6 @@ function CustomerMobileMenu() {
     });
     setPlacedOrders(response.data || []);
     return response.data || [];
-  }, [qrToken]);
-
-  const loadNotifications = useCallback(async () => {
-    const response = await axios.get(`${API_BASE_URL}/notifications`, {
-      params: { qrToken },
-    });
-    setNotifications(response.data || []);
-    setNotificationError('');
   }, [qrToken]);
 
   useEffect(() => {
@@ -135,6 +118,68 @@ function CustomerMobileMenu() {
 
     initPage();
   }, [qrToken]);
+
+  useEffect(() => {
+    if (!qrToken) return undefined;
+
+    let isActive = true;
+    const orderConnection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/orders`)
+      .withAutomaticReconnect()
+      .build();
+    const refreshOrders = () => {
+      if (isActive) {
+        void loadCustomerOrders().catch((requestError) => {
+          setOrderUpdatesError(
+            requestError.response?.data?.message ||
+            requestError.message ||
+            'Không thể cập nhật trạng thái đơn.',
+          );
+        });
+      }
+    };
+    const joinOrderTable = async () => {
+      await orderConnection.invoke('JoinTable', qrToken);
+      if (isActive) refreshOrders();
+    };
+
+    orderHubConnection.current = orderConnection;
+    orderConnection.on('OrderChanged', refreshOrders);
+    orderConnection.on('OrderItemStatusChanged', refreshOrders);
+    orderConnection.onreconnected(() => {
+      void joinOrderTable().catch((connectionError) => {
+        if (isActive) setOrderUpdatesError(connectionError.message);
+      });
+    });
+
+    const connect = async () => {
+      try {
+        await orderConnection.start();
+        await joinOrderTable();
+      } catch (connectionError) {
+        if (isActive) setOrderUpdatesError(connectionError.message);
+      }
+    };
+    void connect();
+
+    return () => {
+      isActive = false;
+      orderConnection.off('OrderChanged', refreshOrders);
+      orderConnection.off('OrderItemStatusChanged', refreshOrders);
+      if (orderHubConnection.current === orderConnection) {
+        orderHubConnection.current = null;
+      }
+      orderConnection.stop().catch((connectionError) => {
+        console.error('Could not stop the customer order hub connection.', connectionError);
+      });
+    };
+  }, [loadCustomerOrders, qrToken]);
+
+  useEffect(() => {
+    if (!staffCallSuccess) return undefined;
+    const timeoutId = window.setTimeout(() => setStaffCallSuccess(''), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [staffCallSuccess]);
 
   useEffect(() => {
     if (!isSubmittedPage) return;
@@ -245,13 +290,6 @@ function CustomerMobileMenu() {
           note: item.note,
         })),
       });
-      if (orderHubConnection.current?.state === 'Connected') {
-        void orderHubConnection.current
-          .invoke('JoinOrder', response.data.orderId)
-          .catch((connectionError) => {
-            setOrderUpdatesError(`Không thể đăng ký cập nhật đơn: ${connectionError.message}`);
-          });
-      }
       setOrderSuccessCode(response.data.orderCode);
       setCart([]);
       setOrderNote('');
@@ -285,63 +323,14 @@ function CustomerMobileMenu() {
     }
   };
 
-  const markCustomerNotificationAsRead = async (notification) => {
-    if (notification.isRead) return;
-
-    try {
-      const { data } = await axios.patch(
-        `${API_BASE_URL}/notifications/${notification.id}/read`,
-        null,
-        { params: { qrToken } },
-      );
-      setNotifications((current) =>
-        current.map((item) => (item.id === data.id ? data : item)),
-      );
-    } catch (requestError) {
-      setNotificationError(
-        requestError.response?.data?.message || requestError.message,
-      );
-    }
-  };
-
-  const customerNotifications = notifications.length > 0 || notificationError ? (
-    <section className="customer-notifications" aria-live="polite">
-      <div className="customer-notifications-heading">
-        <h3>Thông báo</h3>
-        {notifications.some((notification) => !notification.isRead) && (
-          <button
-            type="button"
-            onClick={() =>
-              Promise.all(
-                notifications
-                  .filter((notification) => !notification.isRead)
-                  .map(markCustomerNotificationAsRead),
-              )
-            }
-          >
-            Đọc tất cả
-          </button>
-        )}
-      </div>
-      {notificationError && <p role="alert">{notificationError}</p>}
-      {notifications.slice(0, 10).map((notification) => (
-        <button
-          type="button"
-          className={`customer-notification ${notification.isRead ? '' : 'unread'}`}
-          key={notification.id}
-          onClick={() => void markCustomerNotificationAsRead(notification)}
-        >
-          <strong>{notification.title}</strong>
-          <span>{notification.message}</span>
-          <time dateTime={notification.createdAt}>
-            {new Date(notification.createdAt).toLocaleTimeString('vi-VN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </time>
-        </button>
-      ))}
-    </section>
+  const staffCallFeedback = staffCallSuccess || staffCallError ? (
+    <div
+      className={`customer-call-feedback ${staffCallError ? 'error' : 'success'}`}
+      role={staffCallError ? 'alert' : 'status'}
+      aria-live={staffCallError ? 'assertive' : 'polite'}
+    >
+      {staffCallError || staffCallSuccess}
+    </div>
   ) : null;
 
   if (loading) {
@@ -386,6 +375,7 @@ function CustomerMobileMenu() {
     return (
       <div className="mobile-shell submitted-page-shell">
         <div className="phone-frame submitted-page-frame">
+          {staffCallFeedback}
           <header className="topbar submitted-page-topbar">
             <div className="brand-lockup">
               <h1>Smart POS</h1>
@@ -448,8 +438,6 @@ function CustomerMobileMenu() {
                   : 'Vừa đặt'}
               </div>
             </section>
-            {customerNotifications}
-
             <div className="submitted-note">
               <span>ⓘ</span>
               <p>Trong thời gian chờ món có thể phát sinh chậm trễ. Vui lòng liên hệ nhân viên hỗ trợ nếu cần.</p>
@@ -490,6 +478,7 @@ function CustomerMobileMenu() {
   return (
     <div className="mobile-shell">
       <div className="phone-frame">
+        {staffCallFeedback}
         <header className="topbar">
           <div className="brand-lockup">
             <div>
@@ -631,7 +620,6 @@ function CustomerMobileMenu() {
               {placedOrders.length > 0 && (
                 <section className="cart-placed-orders">
                   {orderUpdatesError && <p role="alert">{orderUpdatesError}</p>}
-                  {customerNotifications}
                   {placedOrders.map((order) => (
                     <article className="cart-placed-order" key={order.id}>
                       <div className="cart-placed-order-heading">
@@ -749,9 +737,10 @@ function CustomerMobileMenu() {
               <button
                 type="button"
                 className="cart-call-staff-button"
-                onClick={() => window.alert('Đã gửi yêu cầu đến nhân viên hỗ trợ.')}
+                disabled={staffCallType !== ''}
+                onClick={() => void handleCallStaff('assistance')}
               >
-                Gọi nhân viên
+                {staffCallType === 'assistance' ? 'Đang gọi nhân viên...' : 'Gọi nhân viên'}
               </button>
             </div>
           </div>

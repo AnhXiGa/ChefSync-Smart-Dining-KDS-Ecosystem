@@ -228,8 +228,7 @@
   border-bottom: 1px solid #edf0ed;
   background: white;
 }
-.notification-popover-header button,
-.customer-notifications-heading button {
+.notification-popover-header button {
   border: 0;
   background: transparent;
   color: #237258;
@@ -274,6 +273,40 @@
 }
 .notification-error {
   color: #ae4237;
+}
+.notification-pagination {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #edf0ed;
+  background: white;
+  color: #73817a;
+  font-size: 10px;
+}
+.notification-pagination,
+.notification-pagination div {
+  align-items: center;
+  justify-content: space-between;
+}
+.notification-pagination,
+.notification-pagination div {
+  display: flex;
+}
+.notification-pagination div {
+  gap: 9px;
+}
+.notification-pagination button {
+  border: 0;
+  background: transparent;
+  color: #237258;
+  font: inherit;
+  cursor: pointer;
+}
+.notification-pagination button:disabled {
+  color: #aab4ae;
+  cursor: default;
 }
 .avatar {
   border-radius: 50%;
@@ -729,4 +762,3 @@
   font-weight: 500;
   margin: 9px 1px 6px;
 }
-

@@ -1190,49 +1190,26 @@
   padding: 15px 17px;
   margin-bottom: 18px;
 }
-.customer-notifications {
-  display: grid;
-  gap: 8px;
-  margin-top: 16px;
-  padding: 14px;
-  border: 1px solid #e5ede7;
-  border-radius: 12px;
-  background: #fff;
+.customer-call-feedback {
+  position: fixed;
+  z-index: 100;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(360px, calc(100vw - 32px));
+  padding: 13px 16px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px #172a201f;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%);
 }
-.customer-notifications-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.customer-call-feedback.success {
+  background: #17684f;
 }
-.customer-notifications-heading h3 {
-  margin: 0;
-  color: #34443e;
-  font-size: 13px;
-}
-.customer-notification {
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 0;
-  border-radius: 8px;
-  background: #f7f9f7;
-  color: #52635b;
-  text-align: left;
-  cursor: pointer;
-}
-.customer-notification.unread {
-  background: #eff8f2;
-}
-.customer-notification strong {
-  color: #34443e;
-  font-size: 12px;
-}
-.customer-notification span,
-.customer-notification time {
-  font-size: 11px;
-}
-.customer-notification time {
-  color: #8a9690;
+.customer-call-feedback.error {
+  background: #a63f36;
 }
 .live-order-panel-head {
   margin-bottom: 8px;

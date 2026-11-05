@@ -9,17 +9,31 @@ public sealed class NotificationsController(
     INotificationService notificationService) : ApiScaffoldController
 {
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<NotificationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(NotificationPageResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<IReadOnlyList<NotificationResponse>>> GetNotifications(
+    public async Task<ActionResult<NotificationPageResponse>> GetNotifications(
         [FromQuery] int? userId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 5)
     {
         if (!IsValidUserId(userId))
             return BadRequest(InvalidUserId());
 
+        if (page < 1 || pageSize is < 1 or > 20)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Tham số phân trang không hợp lệ.",
+                Detail = "page phải từ 1 trở lên và pageSize phải từ 1 đến 20."
+            });
+        }
+
         var notifications = await notificationService.GetNotificationsAsync(
             userId!.Value,
+            page,
+            pageSize,
             cancellationToken);
         return Ok(notifications);
     }

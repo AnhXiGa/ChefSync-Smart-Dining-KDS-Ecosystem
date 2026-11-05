@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HubConnectionBuilder } from "@microsoft/signalr";
 import axiosClient from "../../api/axiosClient";
+
+const PAGE_SIZE = 5;
+const NOTIFICATION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getErrorMessage(error) {
   return (
@@ -13,16 +16,49 @@ function getErrorMessage(error) {
 
 export function NotificationsBell({ userId }) {
   const [notifications, setNotifications] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
+  const pageRef = useRef(1);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (requestedPage = pageRef.current) => {
     try {
       const { data } = await axiosClient.get("/api/notifications", {
-        params: { userId },
+        params: { userId, page: requestedPage, pageSize: PAGE_SIZE },
       });
-      setNotifications(data);
+
+      if (Array.isArray(data)) {
+        const cutoff = Date.now() - NOTIFICATION_RETENTION_MS;
+        const currentNotifications = data.filter(
+          (notification) => new Date(notification.createdAt).getTime() >= cutoff,
+        );
+        const pageCount = Math.ceil(currentNotifications.length / PAGE_SIZE);
+        const currentPage = Math.min(
+          requestedPage,
+          Math.max(pageCount, 1),
+        );
+        const startIndex = (currentPage - 1) * PAGE_SIZE;
+
+        setNotifications(currentNotifications.slice(startIndex, startIndex + PAGE_SIZE));
+        setPage(currentPage);
+        pageRef.current = currentPage;
+        setTotalPages(pageCount);
+        setTotalCount(currentNotifications.length);
+        setUnreadCount(currentNotifications.filter((item) => !item.isRead).length);
+      } else if (data && Array.isArray(data.items)) {
+        setNotifications(data.items);
+        setPage(data.page);
+        pageRef.current = data.page;
+        setTotalPages(data.totalPages);
+        setTotalCount(data.totalCount);
+        setUnreadCount(data.unreadCount);
+      } else {
+        throw new Error("Định dạng dữ liệu thông báo không hợp lệ.");
+      }
+
       setError("");
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -38,21 +74,25 @@ export function NotificationsBell({ userId }) {
       .withAutomaticReconnect()
       .build();
     const handleNotificationsChanged = () => {
-      if (isActive) void loadNotifications();
+      if (isActive) void loadNotifications(pageRef.current);
     };
+    const refreshInterval = window.setInterval(
+      () => void loadNotifications(pageRef.current),
+      60 * 60 * 1000,
+    );
 
     connection.on("NotificationsChanged", handleNotificationsChanged);
     connection.onreconnected(async () => {
       try {
         await connection.invoke("JoinUserNotifications", userId);
-        if (isActive) await loadNotifications();
+        if (isActive) await loadNotifications(pageRef.current);
       } catch (connectionError) {
         if (isActive) setError(getErrorMessage(connectionError));
       }
     });
 
     const connect = async () => {
-      await loadNotifications();
+      await loadNotifications(1);
       try {
         await connection.start();
         if (!isActive) return;
@@ -65,6 +105,7 @@ export function NotificationsBell({ userId }) {
 
     return () => {
       isActive = false;
+      window.clearInterval(refreshInterval);
       connection.off("NotificationsChanged", handleNotificationsChanged);
       connection.stop().catch((connectionError) => {
         console.error("Could not stop the notifications hub connection.", connectionError);
@@ -84,6 +125,7 @@ export function NotificationsBell({ userId }) {
       setNotifications((current) =>
         current.map((item) => (item.id === data.id ? data : item)),
       );
+      setUnreadCount((current) => Math.max(0, current - 1));
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     }
@@ -94,7 +136,8 @@ export function NotificationsBell({ userId }) {
       await axiosClient.patch("/api/notifications/read-all", null, {
         params: { userId },
       });
-      await loadNotifications();
+      setUnreadCount(0);
+      await loadNotifications(pageRef.current);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     }
@@ -127,7 +170,7 @@ export function NotificationsBell({ userId }) {
             <p className="notification-empty">Chưa có thông báo.</p>
           ) : (
             <div className="notification-list">
-              {notifications.slice(0, 30).map((notification) => (
+              {notifications.map((notification) => (
                 <button
                   type="button"
                   className={`notification-item ${notification.isRead ? "" : "unread"}`}
@@ -142,6 +185,32 @@ export function NotificationsBell({ userId }) {
                 </button>
               ))}
             </div>
+          )}
+          {totalPages > 1 && (
+            <nav className="notification-pagination" aria-label="Phân trang thông báo">
+              <span>
+                {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}–{Math.min(page * PAGE_SIZE, totalCount)} / {totalCount}
+              </span>
+              <div>
+                <button
+                  type="button"
+                  aria-label="Trang trước"
+                  disabled={page <= 1}
+                  onClick={() => void loadNotifications(page - 1)}
+                >
+                  Trước
+                </button>
+                <span>Trang {page}/{totalPages}</span>
+                <button
+                  type="button"
+                  aria-label="Trang sau"
+                  disabled={page >= totalPages}
+                  onClick={() => void loadNotifications(page + 1)}
+                >
+                  Sau
+                </button>
+              </div>
+            </nav>
           )}
         </section>
       )}

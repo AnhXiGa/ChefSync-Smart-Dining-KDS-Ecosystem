@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import { BackofficeLayout, PageTitle } from "../../components/shared/Ui";
+import { usePosOrderChanges } from "../../hooks/usePosOrderChanges";
 import "./ManagerTablesPage.css";
 
 const statuses = [
@@ -39,6 +40,13 @@ export function ManagerTablesPage() {
       setError(messageOf(requestError, "Không tải được danh sách bàn. Hãy kiểm tra backend và kết nối cơ sở dữ liệu."));
     }
   }, []);
+  const handleOrdersChanged = useCallback(() => {
+    void loadTables();
+  }, [loadTables]);
+  const handleHubError = useCallback((connectionError) => {
+    setError(messageOf(connectionError, "Mất kết nối cập nhật đơn realtime."));
+  }, []);
+  usePosOrderChanges(handleOrdersChanged, handleHubError);
 
   // This effect synchronizes the page with the tables API on entry.
   // oxlint-disable-next-line react/set-state-in-effect

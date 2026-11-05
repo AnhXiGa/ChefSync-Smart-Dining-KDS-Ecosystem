@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { BackofficeLayout, PageTitle } from "../../components/shared/Ui";
 import { getPaymentByOrder } from "../../api/paymentApi";
+import { usePosOrderChanges } from "../../hooks/usePosOrderChanges";
 import {
   TableCard,
   TableDetails,
@@ -68,6 +69,13 @@ export function StaffTablesPage() {
       setError(requestError.response?.data?.message || "Không tải được danh sách bàn.");
     }
   }, []);
+  const handleOrdersChanged = useCallback(() => {
+    void loadTables();
+  }, [loadTables]);
+  const handleHubError = useCallback((connectionError) => {
+    setError(connectionError.message || "Mất kết nối cập nhật đơn realtime.");
+  }, []);
+  usePosOrderChanges(handleOrdersChanged, handleHubError);
   useEffect(() => {
     void loadTables();
     const intervalId = window.setInterval(() => {

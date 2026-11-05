@@ -2,9 +2,11 @@ using System.Text;
 using backend.Configuration;
 using backend.Data;
 using backend.DTOs.Payments;
+using backend.Hubs;
 using backend.Models;
 using backend.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 
 namespace backend.Services.Implementations;
@@ -13,13 +15,16 @@ public class PaymentService : IPaymentService
 {
     private readonly AppDbContext _context;
     private readonly PaymentOptions _paymentOptions;
+    private readonly IHubContext<OrderHub> _orderHub;
 
     public PaymentService(
         AppDbContext context,
-        IOptions<PaymentOptions> paymentOptions)
+        IOptions<PaymentOptions> paymentOptions,
+        IHubContext<OrderHub> orderHub)
     {
         _context = context;
         _paymentOptions = paymentOptions.Value;
+        _orderHub = orderHub;
     }
 
     // =========================================================
@@ -350,6 +355,9 @@ public class PaymentService : IPaymentService
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+            await PublishOrderChangedAsync(
+                payment.OrderId,
+                payment.Order.TableId);
 
             return MapToResponse(payment);
         }
@@ -526,6 +534,9 @@ public class PaymentService : IPaymentService
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+            await PublishOrderChangedAsync(
+                payment.OrderId,
+                payment.Order.TableId);
 
             return true;
         }
@@ -539,6 +550,24 @@ public class PaymentService : IPaymentService
     // =========================================================
     // TRANSFER CONTENT
     // =========================================================
+
+    private Task PublishOrderChangedAsync(int orderId, int tableId)
+    {
+        var payload = new { orderId, tableId };
+        return Task.WhenAll(
+            _orderHub.Clients
+                .Group(OrderHub.PosGroupName)
+                .SendAsync("OrdersChanged"),
+            _orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(orderId))
+                .SendAsync("OrderChanged", payload),
+            _orderHub.Clients
+                .Group(OrderHub.GetTableGroup(tableId))
+                .SendAsync("OrderChanged", payload),
+            _orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync("KdsOrdersChanged"));
+    }
 
     private string GenerateTransferContent(
         int orderId)

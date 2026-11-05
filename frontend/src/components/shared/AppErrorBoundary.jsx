@@ -18,7 +18,7 @@ export class AppErrorBoundary extends Component {
       <main className="app-error-page">
         <section className="app-error-card" role="alert">
           <h1>Không thể hiển thị trang</h1>
-          <p>Đã xảy ra lỗi sau thao tác thanh toán. Vui lòng tải lại trang.</p>
+          <p>Đã xảy ra lỗi khi hiển thị trang. Vui lòng tải lại trang.</p>
           <button className="primary" type="button" onClick={() => window.location.reload()}>
             Tải lại trang
           </button>

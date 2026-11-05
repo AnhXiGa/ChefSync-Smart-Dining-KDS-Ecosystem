@@ -366,8 +366,9 @@ public sealed class CustomerController : ControllerBase
                 .Group(OrderHub.KitchenGroupName)
                 .SendAsync("OrderItemStatusChanged", response, cancellationToken),
             _orderHub.Clients
-                .Group(OrderHub.KitchenGroupName)
-                .SendAsync("KdsOrdersChanged", cancellationToken));
+                .Group(OrderHub.GetTableGroup(order.TableId))
+                .SendAsync("OrderItemStatusChanged", response, cancellationToken));
+        await PublishOrderChangedAsync(order.Id, order.TableId, cancellationToken);
 
         return Ok(new
         {
@@ -565,9 +566,10 @@ public sealed class CustomerController : ControllerBase
                 "Order",
                 activeOrder.Id,
                 cancellationToken);
-            await _orderHub.Clients
-                .Group(OrderHub.KitchenGroupName)
-                .SendAsync("KdsOrdersChanged", cancellationToken);
+            await PublishOrderChangedAsync(
+                activeOrder.Id,
+                table.Id,
+                cancellationToken);
 
             return Ok(new
             {
@@ -594,5 +596,26 @@ public sealed class CustomerController : ControllerBase
         return _context.RestaurantTables.FirstOrDefaultAsync(
             table => table.QrToken == token,
             cancellationToken);
+    }
+
+    private Task PublishOrderChangedAsync(
+        int orderId,
+        int tableId,
+        CancellationToken cancellationToken)
+    {
+        var payload = new { orderId, tableId };
+        return Task.WhenAll(
+            _orderHub.Clients
+                .Group(OrderHub.PosGroupName)
+                .SendAsync("OrdersChanged", cancellationToken),
+            _orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(orderId))
+                .SendAsync("OrderChanged", payload, cancellationToken),
+            _orderHub.Clients
+                .Group(OrderHub.GetTableGroup(tableId))
+                .SendAsync("OrderChanged", payload, cancellationToken),
+            _orderHub.Clients
+                .Group(OrderHub.KitchenGroupName)
+                .SendAsync("KdsOrdersChanged", cancellationToken));
     }
 }

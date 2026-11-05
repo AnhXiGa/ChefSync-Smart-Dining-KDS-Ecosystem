@@ -4,8 +4,10 @@ namespace backend.Services.Interfaces;
 
 public interface INotificationService
 {
-    Task<IReadOnlyList<NotificationResponse>> GetNotificationsAsync(
+    Task<NotificationPageResponse> GetNotificationsAsync(
         int userId,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken);
 
     Task<NotificationResponse?> GetNotificationAsync(

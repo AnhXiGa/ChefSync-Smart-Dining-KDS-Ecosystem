@@ -13,3 +13,11 @@ public sealed record NotificationResponse(
     DateTimeOffset? ReadAt,
     DateTimeOffset CreatedAt,
     int? TableId);
+
+public sealed record NotificationPageResponse(
+    IReadOnlyList<NotificationResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages,
+    int UnreadCount);

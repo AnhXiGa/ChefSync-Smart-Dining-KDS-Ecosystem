@@ -13,18 +13,37 @@ public sealed class NotificationService(
     IHubContext<NotificationHub> notificationHub)
     : INotificationService
 {
-    public async Task<IReadOnlyList<NotificationResponse>> GetNotificationsAsync(
+    public async Task<NotificationPageResponse> GetNotificationsAsync(
         int userId,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken)
     {
-        var notifications = await context.Notifications
+        var notificationsQuery = context.Notifications
             .AsNoTracking()
-            .Where(notification => notification.UserId == userId)
+            .Where(notification =>
+                notification.UserId == userId &&
+                notification.CreatedAt >= DateTime.UtcNow.AddDays(-7));
+        var totalCount = await notificationsQuery.CountAsync(cancellationToken);
+        var unreadCount = await notificationsQuery.CountAsync(
+            notification => !notification.IsRead,
+            cancellationToken);
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+        var currentPage = Math.Min(page, Math.Max(totalPages, 1));
+        var notifications = await notificationsQuery
             .OrderByDescending(notification => notification.CreatedAt)
-            .Take(100)
+            .ThenByDescending(notification => notification.Id)
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return notifications.Select(Map).ToList();
+        return new NotificationPageResponse(
+            notifications.Select(Map).ToList(),
+            currentPage,
+            pageSize,
+            totalCount,
+            totalPages,
+            unreadCount);
     }
 
     public async Task<IReadOnlyList<NotificationResponse>> GetCustomerNotificationsAsync(
@@ -33,7 +52,9 @@ public sealed class NotificationService(
     {
         var notifications = await context.Notifications
             .AsNoTracking()
-            .Where(notification => notification.TableId == tableId)
+            .Where(notification =>
+                notification.TableId == tableId &&
+                notification.CreatedAt >= DateTime.UtcNow.AddDays(-7))
             .OrderByDescending(notification => notification.CreatedAt)
             .Take(50)
             .ToListAsync(cancellationToken);

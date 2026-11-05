@@ -155,9 +155,7 @@ public class OrderService : IOrderService
             ?? throw new Exception(
                 "Không thể lấy đơn hàng vừa tạo.");
 
-        await _orderHub.Clients
-            .Group(OrderHub.KitchenGroupName)
-            .SendAsync("KdsOrdersChanged");
+        await PublishOrderChangedAsync(createdOrder.Id, createdOrder.TableId);
 
         return createdOrder;
     }
@@ -291,7 +289,9 @@ public class OrderService : IOrderService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        return MapToResponse(order);
+        var response = MapToResponse(order);
+        await PublishOrderChangedAsync(response.Id, response.TableId);
+        return response;
     }
 
     public async Task<OrderResponse> UpdateDiscountAsync(
@@ -321,7 +321,9 @@ public class OrderService : IOrderService
         order.TotalAmount = Math.Max(0, order.Subtotal + order.Tax - order.Discount);
         order.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return MapToResponse(order);
+        var response = MapToResponse(order);
+        await PublishOrderChangedAsync(response.Id, response.TableId);
+        return response;
     }
 
     // =========================================================
@@ -379,6 +381,7 @@ public class OrderService : IOrderService
         }
 
         var oldTable = order.Table;
+        var oldTableId = oldTable.Id;
 
         order.TableId = targetTable.Id;
         order.Table = targetTable;
@@ -392,7 +395,9 @@ public class OrderService : IOrderService
 
         await _context.SaveChangesAsync();
 
-        return MapToResponse(order);
+        var response = MapToResponse(order);
+        await PublishOrderChangedAsync(response.Id, response.TableId, oldTableId);
+        return response;
     }
 
     // =========================================================
@@ -507,9 +512,12 @@ public class OrderService : IOrderService
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            return await GetByIdAsync(targetOrder.Id)
+            var response = await GetByIdAsync(targetOrder.Id)
                 ?? throw new Exception(
                     "Không thể lấy đơn sau khi gộp.");
+            await PublishOrdersChangedAsync(
+                orders.Select(order => (order.Id, order.TableId)));
+            return response;
         }
         catch
         {
@@ -699,9 +707,12 @@ public class OrderService : IOrderService
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            return await GetByIdAsync(newOrder.Id)
+            var response = await GetByIdAsync(newOrder.Id)
                 ?? throw new Exception(
                     "Không thể lấy đơn mới sau khi tách.");
+            await PublishOrdersChangedAsync(
+                [(order.Id, order.TableId), (response.Id, response.TableId)]);
+            return response;
         }
         catch
         {
@@ -745,6 +756,7 @@ public class OrderService : IOrderService
         order.Table.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        await PublishOrderChangedAsync(order.Id, order.TableId);
 
         return true;
     }
@@ -752,6 +764,50 @@ public class OrderService : IOrderService
     // =========================================================
     // HELPERS
     // =========================================================
+
+    private Task PublishOrdersChangedAsync(
+        IEnumerable<(int OrderId, int TableId)> orders)
+    {
+        var distinctOrders = orders.Distinct().ToArray();
+        var tasks = new List<Task>
+        {
+            _orderHub.Clients
+                .Group(OrderHub.PosGroupName)
+                .SendAsync("OrdersChanged")
+        };
+
+        foreach (var orderId in distinctOrders.Select(order => order.OrderId).Distinct())
+        {
+            tasks.Add(_orderHub.Clients
+                .Group(OrderHub.GetOrderGroup(orderId))
+                .SendAsync("OrderChanged"));
+        }
+
+        foreach (var (orderId, tableId) in distinctOrders)
+        {
+            var payload = new { orderId, tableId };
+            tasks.Add(_orderHub.Clients
+                .Group(OrderHub.GetTableGroup(tableId))
+                .SendAsync("OrderChanged", payload));
+        }
+
+        tasks.Add(_orderHub.Clients
+            .Group(OrderHub.KitchenGroupName)
+            .SendAsync("KdsOrdersChanged"));
+
+        return Task.WhenAll(tasks);
+    }
+
+    private Task PublishOrderChangedAsync(
+        int orderId,
+        int tableId,
+        int? previousTableId = null)
+    {
+        var tables = previousTableId.HasValue
+            ? new[] { (orderId, tableId), (orderId, previousTableId.Value) }
+            : [(orderId, tableId)];
+        return PublishOrdersChangedAsync(tables);
+    }
 
     private static void RecalculateOrder(Order order)
     {
